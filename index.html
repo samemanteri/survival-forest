@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171b16">
+  <title>Korpi – Metsäselviytyminen</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css?v=14">
+  <script src="terrain-map.js?v=6" defer></script>
+  <script src="tree-collision.js?v=7" defer></script>
+  <script src="view-loader.js?v=14" defer></script>
+  <script src="expedition.js?v=14" defer></script>
+  <script src="crafting.js?v=14" defer></script>
+  <script src="weather.js?v=11" defer></script>
+  <script src="mystery.js?v=12" defer></script>
+  <script src="game.js?v=14" defer></script>
+</head>
+<body>
+  <svg class="symbol-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-logo" viewBox="0 0 28 28"><path d="m11 3-5 7h3l-5 6h4l-5 6h16l-5-6h4l-5-6h3l-5-7ZM11 22v3M19 8l4 6h-2l4 5h-3l3 3h-3m-1 0v3"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
+    <symbol id="i-sunset" viewBox="0 0 24 24"><path d="M2 17h20M5 21h14M7 17a5 5 0 0 1 10 0M12 4v6m-3-3 3 3 3-3m-9 5-2-2m14 2 2-2"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.8 15.1A8.8 8.8 0 0 1 9 3.2 9 9 0 1 0 20.8 15.1Z"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24"><path d="m11 5-5 4H3v6h3l5 4V5Zm5 4a4.3 4.3 0 0 1 0 6m3-9a8.5 8.5 0 0 1 0 12"/></symbol>
+    <symbol id="i-muted" viewBox="0 0 24 24"><path d="m11 5-5 4H3v6h3l5 4V5Zm5 5 5 5m0-5-5 5"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14m6-14v14" stroke-width="2.6"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.3"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15"/></symbol>
+    <symbol id="i-direction" viewBox="0 0 24 24"><path d="m12 3 7 16-7-4-7 4 7-16Z"/></symbol>
+    <symbol id="i-house" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7M5 9v11h14V9m-9 11v-7h4v7"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 8.6c0 4.2-8.8 9.9-8.8 9.9s-8.8-5.7-8.8-9.9A4.7 4.7 0 0 1 12 6.3a4.7 4.7 0 0 1 8.8 2.3Z"/></symbol>
+    <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M2 12h4l3-6 4 12 3-6h6"/></symbol>
+    <symbol id="i-food" viewBox="0 0 24 24"><path d="M11 7c0-2.4 1.8-4 4-4 0 2.1-1.5 4-4 4ZM12 9c2-2 6.7-2 7 3.4.2 3.7-2.2 7.6-4.7 7.6-.8 0-1.5-.5-2.3-.5s-1.5.5-2.3.5C7.2 20 4.8 16.1 5 12.4 5.3 7 10 7 12 9Z"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3c2.4 4 6.3 7.6 6.3 11.3a6.3 6.3 0 0 1-12.6 0C5.7 10.6 9.6 7 12 3Z"/></symbol>
+    <symbol id="i-energy" viewBox="0 0 24 24"><path d="m13 2-8 12h6l-1 8 9-12h-6l1-8Z"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4c5-4 8 4 14 0v11c-6 4-9-4-14 0"/></symbol>
+    <symbol id="i-craft" viewBox="0 0 24 24"><path d="m3 8 9-5 9 5v9l-9 5-9-5V8Zm0 0 9 5 9-5m-9 5v9m-4-11 9-5"/></symbol>
+    <symbol id="i-pack" viewBox="0 0 24 24"><rect x="5" y="6" width="14" height="15" rx="3"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M5 13h14M9 13v3m6-3v3"/></symbol>
+    <symbol id="i-torch" viewBox="0 0 24 24"><path d="M8 3h8v4l-2 3v10a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V10L8 7V3Zm0 4h8m-4 6h.01"/></symbol>
+    <symbol id="i-berries" viewBox="0 0 24 24"><circle cx="8.3" cy="12.5" r="3.5"/><circle cx="15.7" cy="12.5" r="3.5"/><path d="M9.2 16a3.5 3.5 0 1 0 5.6 0M12 9V6m0 0c0-2 2-3 4-3 0 2-2 3-4 3Z"/></symbol>
+    <symbol id="i-bottle" viewBox="0 0 24 24"><path d="M10 3h4v4l2 2a3 3 0 0 1 1 2.2V19a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-7.8A3 3 0 0 1 8 9l2-2V3Zm-3 10h10M9 3h6"/></symbol>
+    <symbol id="i-bandage" viewBox="0 0 24 24"><rect x="2.5" y="8" width="19" height="8" rx="3" transform="rotate(-43 12 12)"/><path d="m8 10 4 4m0-8 4 4m-5 1h.01m2 2h.01"/></symbol>
+    <symbol id="i-wood" viewBox="0 0 24 24"><path d="m4 14 10-9a3.5 3.5 0 0 1 5 5l-3 2M10 17l7-6a3.5 3.5 0 0 1 5 5l-8 5"/><circle cx="6.5" cy="16.5" r="3.5"/><circle cx="12.5" cy="18.5" r="3.5"/><path d="M6.5 16.5h.01m6 2h.01"/></symbol>
+    <symbol id="i-stone" viewBox="0 0 24 24"><path d="m2 16 4-8 6-4 7 4 3 8-5 4H7l-5-4Z"/><path d="m6 8 5 5 8-5M11 13l-4 7"/></symbol>
+    <symbol id="i-wool" viewBox="0 0 24 24"><path d="M5 17a4 4 0 0 1-1-7 4 4 0 0 1 6-5 4 4 0 0 1 7 2 5 5 0 0 1 1 10H5Zm4 0v2m6-2v2"/></symbol>
+    <symbol id="i-fog" viewBox="0 0 24 24"><path d="M3 10h18M5 14h14M3 18h12M9 6h8"/></symbol>
+    <symbol id="i-rain" viewBox="0 0 24 24"><path d="M5 13a4 4 0 0 1 0-8 5 5 0 0 1 9.1 0 4 4 0 1 1 4 8H5Zm3 3-2 4m7-4-2 4m7-4-2 4"/></symbol>
+    <symbol id="i-thunder" viewBox="0 0 24 24"><path d="M5 13a4 4 0 0 1 0-8 5 5 0 0 1 9.1 0 4 4 0 1 1 4 8h-2m-6 0H5m8-2-4 6h4l-2 5"/></symbol>
+    <symbol id="i-bunker" viewBox="0 0 24 24"><path d="M2 20h20M3 20l3-11 4-4h4l4 4 3 11M8 20v-9h8v9m-3-4h.01"/></symbol>
+    <symbol id="i-hatch" viewBox="0 0 24 24"><path d="m3 15 7-4 11 4-8 5-10-5Zm7-4V4l11 3v8m-9 2 3-2"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 18C2 9 10 4 21 4c0 10-5 16-13 15m-4 2L16 9"/></symbol>
+    <symbol id="i-journal" viewBox="0 0 24 24"><path d="M6 3h13v18H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Zm-3 15a3 3 0 0 1 3-3h13M8 7h7m-7 4h5"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></symbol>
+    <symbol id="i-keycard" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18m-14 4h4m4 0h2"/></symbol>
+    <symbol id="i-recording" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3V9Z"/></symbol>
+    <symbol id="i-mushrooms" viewBox="0 0 24 24"><path d="M3 11a9 9 0 0 1 18 0c0 2-18 2-18 0Zm7 2-1 6c0 2 6 2 6 0l-1-6M8 8h.01M15 7h.01"/></symbol>
+    <symbol id="i-campfire" viewBox="0 0 24 24"><path d="M12 3c2 4 1 6 4 8l1-3c4 4 4 9-1 11H8c-4-2-5-6-1-10l1 3 4-9ZM5 22l14-3M5 19l14 3"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.3 9a2.7 2.7 0 1 1 4 2.4c-1 .6-1.3 1-1.3 2.1m0 3.5h.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4.9 2.8 18A1.4 1.4 0 0 0 4 20h16a1.4 1.4 0 0 0 1.2-2L13.7 4.9a2 2 0 0 0-3.4 0ZM12 9v4m0 3.5h.01"/></symbol>
+    <symbol id="i-door" viewBox="0 0 24 24"><path d="M3 21h12M5 21V3h9v18m-3-9h.01m6-4 4 4-4 4m-2-4h6"/></symbol>
+    <symbol id="i-bed" viewBox="0 0 24 24"><path d="M3 6v13m18-7v7M3 16h18v-4a2 2 0 0 0-2-2H9v6m-6-4h6M6 9h.01"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-fish" viewBox="0 0 24 24"><path d="M3 12c4-6 10-6 14-1l4-4v10l-4-4c-4 5-10 5-14-1Z"/><path d="M8 11h.01"/></symbol>
+    <symbol id="i-hen" viewBox="0 0 24 24"><path d="M5 10 2 9l3-2c1-3 5-3 6 0l1 4c2 1 5 1 8-2l1 5c0 4-5 6-9 6-5 0-7-2-7-6v-4Zm6 10v2m5-2v2m-9-13h.01"/></symbol>
+    <symbol id="i-gate" viewBox="0 0 24 24"><path d="M3 21V4h18v17M3 8h18M3 13h18M7 13v8m5-8v8m5-8v8M3 20l9-7 9 7"/></symbol>
+    <symbol id="i-tower" viewBox="0 0 24 24"><path d="m3 8 9-5 9 5H3Zm3 0v6h12V8M8 14l-2 8m10-8 2 8M9 14l7 7m0-7-7 7M10 11h4"/></symbol>
+    <symbol id="i-car" viewBox="0 0 24 24"><path d="m5 10 2-5h10l2 5M3 11l2-1h14l2 1v7H3v-7Zm2 7v2m14-2v2M6 14h2m8 0h2"/></symbol>
+    <symbol id="i-garage" viewBox="0 0 24 24"><path d="M3 21V9l9-6 9 6v12M6 21V11h12v10M6 14h12M6 17h12"/></symbol>
+    <symbol id="i-axe" viewBox="0 0 24 24"><path d="m12 9-9 11 2 2 10-11M10 7l5-5 7 5-5 6-7-6Z"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M10 15c-4-2-3-5-1-7l2 2 2-7c2 3 5 4 5 8 0 2-2 4-5 4m0 0-4 7H7l3-7"/></symbol>
+    <symbol id="i-boat" viewBox="0 0 24 24"><path d="M3 13h18l-3 5H6l-3-5Zm4 0 2-4h6l2 4M6 7l10 9M3 22c2-1.5 4-1.5 6 0 2-1.5 4-1.5 6 0 2-1.5 4-1.5 6 0"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-icon"><svg class="icon"><use href="#i-logo"/></svg></span>
+        <div class="brand-text">
+          <span class="wordmark">KORPI</span>
+          <span class="brand-caption">Metsäselviytyminen</span>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="clock" aria-label="Pelin aika">
+          <span class="clock-icon"><svg class="icon"><use id="clock-icon" href="#i-sun"/></svg></span>
+          <span id="clock-day" class="clock-day">Päivä 1</span>
+          <span id="clock-time" class="clock-time">17.40</span>
+        </div>
+        <button id="sound" type="button" class="icon-button" aria-label="Äänet" aria-pressed="false" title="Äänet">
+          <svg class="icon"><use id="sound-icon" href="#i-muted"/></svg>
+        </button>
+        <button id="pause" type="button" class="icon-button" aria-label="Tauko" title="Tauko (Esc)">
+          <svg class="icon"><use href="#i-pause"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="game-column" aria-label="Pelialue">
+      <div id="scene" class="scene">
+        <canvas id="game-canvas" class="game-canvas" aria-hidden="true"></canvas>
+        <canvas id="weather-canvas" class="weather-canvas" aria-hidden="true" hidden></canvas>
+        <div id="world" class="world">
+          <svg id="fishing-overlay" class="fishing-overlay" aria-hidden="true" hidden>
+            <line stroke="#ded7c1" stroke-opacity=".75" stroke-width="1"/>
+            <g>
+              <ellipse rx="9" ry="3" fill="none" stroke="#aed5d3" stroke-opacity=".75"/>
+              <circle cy="-1" r="3" fill="#d95f44" stroke="#f3dfbb"/>
+            </g>
+          </svg>
+        </div>
+        <div id="interior" class="interior" hidden>
+          <img id="garage-car" class="garage-car" src="assets/car.webp" alt="Auto tallissa" draggable="false" hidden>
+          <button id="search-shelter" class="map-marker shelter-loot" type="button">
+            <svg class="icon"><use id="search-icon" href="#i-pack"/></svg><span id="search-label">Tutki pöytä</span>
+          </button>
+          <button id="bunker-hatch" class="bunker-hatch" type="button" hidden>
+            <span class="hatch-illustration" aria-hidden="true"></span>
+            <span class="game-button"><svg class="icon" aria-hidden="true"><use href="#i-hatch"/></svg><span id="bunker-hatch-label">Avaa luukku</span></span>
+          </button>
+          <div class="interior-actions">
+            <button id="leave" type="button" class="game-button"><svg class="icon"><use href="#i-door"/></svg> Ulos</button>
+            <button id="rest" type="button" class="game-button"><svg class="icon"><use href="#i-bed"/></svg><span id="rest-label">Lepää</span></button>
+          </div>
+        </div>
+        <div class="map-vignette" aria-hidden="true"></div>
+        <div class="map-heading">
+          <span class="map-location"><svg class="icon"><use id="location-icon" href="#i-pin"/></svg><span id="location">Metsälampi</span></span>
+          <h1 id="area-title">Korpimetsä</h1>
+          <span id="weather-badge" class="weather-badge" role="status">
+            <svg class="icon" aria-hidden="true"><use id="weather-icon" href="#i-sun"/></svg><span id="weather-name">Pouta</span>
+          </span>
+        </div>
+        <button id="open-map" type="button" class="game-button open-map" title="Avaa erämaakartta (M)" disabled>
+          <svg class="icon"><use href="#i-map"/></svg> Kartta <kbd>M</kbd>
+        </button>
+        <button id="map-direction" type="button" class="game-button map-direction" title="Poista reittimerkki" hidden>
+          <svg id="map-arrow" class="icon"><use href="#i-direction"/></svg><span id="map-direction-text"></span>
+        </button>
+        <div class="field-status" id="field-status" role="status">
+          <span class="status-icon"><svg class="icon"><use id="status-icon" href="#i-sunset"/></svg></span>
+          <div><strong id="status-title">Ilta lähestyy</strong><span id="status-copy">Etsi suoja ennen pimeää.</span></div>
+        </div>
+        <button id="interact" type="button" class="interaction game-button" hidden>
+          <kbd>E</kbd><span id="interact-label"></span>
+        </button>
+        <div id="hit-flash" class="hit-flash" aria-hidden="true"></div>
+        <div id="tunnel-passage" class="tunnel-passage" role="status" hidden>
+          <strong>Maanalainen käytävä</strong>
+          <span id="tunnel-destination"></span>
+        </div>
+        <p id="game-loading" class="game-loading" role="status">Metsä latautuu…</p>
+        <noscript><p class="game-loading">Salli JavaScript selaimessa, jotta voit pelata.</p></noscript>
+      </div>
+      <div id="control-strip" class="control-strip">
+        <div class="controls" aria-label="Pelin ohjaimet">
+          <span class="control-group"><span class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Liiku</span></span>
+          <span class="control-group"><kbd>Shift</kbd><span>Juokse</span></span>
+          <span class="control-group"><kbd>E</kbd><span>Toimi</span></span>
+          <span class="control-group"><kbd>F</kbd><span>Taskulamppu</span></span>
+        </div>
+        <div class="touch-controls">
+          <span>Liiku napauttamalla</span>
+          <button id="touch-run" type="button" class="help-button" aria-pressed="false"><svg class="icon"><use href="#i-energy"/></svg> Juokse</button>
+        </div>
+        <div id="drive-controls" class="drive-controls" aria-label="Ajo-ohjaimet" hidden>
+          <strong id="car-speed" class="car-speed">0 km/h</strong>
+          <div class="drive-keys">
+            <span class="control-group"><kbd>WASD / nuolet</kbd><span id="drive-action">Aja</span></span>
+            <span id="drive-brake-key" class="control-group"><kbd>Välilyönti</kbd> Jarruta</span>
+          </div>
+          <div class="drive-buttons">
+            <button class="game-button" type="button" data-drive="left" data-car-label="Käännä vasemmalle" data-boat-label="Souda vasemmalle" aria-label="Käännä vasemmalle">←</button>
+            <button class="game-button" type="button" data-drive="right" data-car-label="Käännä oikealle" data-boat-label="Souda oikealle" aria-label="Käännä oikealle">→</button>
+            <button class="game-button" type="button" data-drive="reverse" data-car-label="Peruuta" data-boat-label="Souda alas" aria-label="Peruuta">↓</button>
+            <button class="game-button" type="button" data-drive="forward" data-car-label="Kaasuta" data-boat-label="Souda ylös" aria-label="Kaasuta">↑</button>
+            <button id="drive-brake" class="game-button" type="button" data-drive="brake" aria-label="Jarruta">■</button>
+          </div>
+        </div>
+        <button id="help" type="button" class="help-button"><svg class="icon"><use href="#i-help"/></svg> Ohjeet</button>
+      </div>
+    </section>
+
+    <aside class="sidebar" aria-label="Selviytyjän tiedot">
+      <section class="panel">
+        <h2 class="panel-title"><svg class="icon"><use href="#i-pulse"/></svg> Selviytyminen</h2>
+        <div class="meters">
+          <div class="meter health">
+            <div class="meter-label"><svg class="icon"><use href="#i-heart"/></svg><span>Terveys</span><output id="health-value">100%</output></div>
+            <div class="meter-track" role="meter" aria-label="Terveys" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><div id="health-bar" class="meter-fill" style="--level:100%"></div></div>
+          </div>
+          <div class="meter hunger">
+            <div class="meter-label"><svg class="icon"><use href="#i-food"/></svg><span>Kylläisyys</span><output id="hunger-value">74%</output></div>
+            <div class="meter-track" role="meter" aria-label="Kylläisyys" aria-valuemin="0" aria-valuemax="100" aria-valuenow="74"><div id="hunger-bar" class="meter-fill" style="--level:74%"></div></div>
+          </div>
+          <div class="meter thirst">
+            <div class="meter-label"><svg class="icon"><use href="#i-drop"/></svg><span>Nesteytys</span><output id="thirst-value">68%</output></div>
+            <div class="meter-track" role="meter" aria-label="Nesteytys" aria-valuemin="0" aria-valuemax="100" aria-valuenow="68"><div id="thirst-bar" class="meter-fill" style="--level:68%"></div></div>
+          </div>
+          <div class="meter energy">
+            <div class="meter-label"><svg class="icon"><use href="#i-energy"/></svg><span>Jaksaminen</span><output id="energy-value">90%</output></div>
+            <div class="meter-track" role="meter" aria-label="Jaksaminen" aria-valuemin="0" aria-valuemax="100" aria-valuenow="90"><div id="energy-bar" class="meter-fill" style="--level:90%"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel objective">
+        <h2 class="panel-title"><svg class="icon"><use href="#i-flag"/></svg> Tavoite</h2>
+        <button id="open-expedition" class="game-button open-crafting" type="button" disabled>
+          <svg class="icon"><use href="#i-journal"/></svg> Löytöpäiväkirja <kbd>J</kbd>
+        </button>
+        <div class="objective-body">
+          <h3>Ensimmäinen yö</h3>
+          <ul class="tasks">
+            <li id="task-shelter" class="current"><span class="task-mark"><svg class="icon"><use href="#i-check"/></svg></span><span>Löydä suoja</span></li>
+            <li id="task-torch"><span class="task-mark"><svg class="icon"><use href="#i-check"/></svg></span><span>Etsi taskulamppu</span></li>
+            <li id="task-dawn"><span class="task-mark"><svg class="icon"><use href="#i-check"/></svg></span><span>Selviä aamunkoittoon</span></li>
+          </ul>
+        </div>
+        <div class="objective-body">
+          <h3>Mökin arvoitus</h3>
+          <ul class="tasks">
+            <li id="task-bunker" class="current"><span class="task-mark"><svg class="icon"><use href="#i-check"/></svg></span><span>Löydä metsäbunkkeri</span></li>
+            <li id="task-keycard"><span class="task-mark"><svg class="icon"><use href="#i-check"/></svg></span><span>Poimi kulkukortti</span></li>
+            <li id="task-army-cabin"><span class="task-mark"><svg class="icon"><use href="#i-check"/></svg></span><span>Avaa armeijan mökki</span></li>
+            <li id="task-recording"><span class="task-mark"><svg class="icon"><use href="#i-check"/></svg></span><span>Katso mökin tallenne</span></li>
+          </ul>
+          <p id="mystery-hint" class="objective-hint">Etsi betonista ovea Vartijankankaan pohjoislaidalla.</p>
+        </div>
+      </section>
+
+      <section class="panel inventory">
+        <h2 class="panel-title"><svg class="icon"><use href="#i-pack"/></svg> Reppu</h2>
+        <button id="open-crafting" class="game-button open-crafting" type="button" disabled>
+          <svg class="icon"><use href="#i-craft"/></svg> Rakentaminen <kbd>B</kbd>
+        </button>
+        <div class="inventory-grid">
+          <button type="button" id="slot-torch" class="slot unavailable" aria-label="Taskulamppu, ei vielä löydetty" title="Taskulamppu (1 tai F)">
+            <kbd>1</kbd><svg class="icon"><use href="#i-torch"/></svg><span id="torch-count" class="item-count"></span>
+          </button>
+          <button type="button" id="slot-berries" class="slot unavailable" aria-label="Marjat, 0 annosta" title="Syö marjoja (2)">
+            <kbd>2</kbd><svg class="icon"><use href="#i-berries"/></svg><span id="berries-count" class="item-count"></span>
+          </button>
+          <button type="button" id="slot-water" class="slot water-slot" aria-label="Vesi, 1 annos" title="Juo vettä (3)">
+            <kbd>3</kbd><svg class="icon"><use href="#i-bottle"/></svg><span id="water-count" class="item-count">1</span>
+          </button>
+          <button type="button" id="slot-bandage" class="slot unavailable" aria-label="Side, 0 kappaletta" title="Käytä sidettä (4)">
+            <kbd>4</kbd><svg class="icon"><use href="#i-bandage"/></svg><span id="bandage-count" class="item-count"></span>
+          </button>
+          <button type="button" id="slot-mushrooms" class="slot unavailable" aria-label="Ruokasienet, 0 kpl" title="Syö ruokasieniä (5)">
+            <kbd>5</kbd><svg class="icon"><use href="#i-mushrooms"/></svg><span id="mushrooms-count" class="item-count"></span>
+          </button>
+          <button type="button" id="slot-fish" class="slot unavailable" aria-label="Kala, 0 kpl" title="Syö kalaa (6)">
+            <kbd>6</kbd><svg class="icon"><use href="#i-fish"/></svg><span id="fish-count" class="item-count"></span>
+          </button>
+          <div id="slot-wood" class="slot material-slot unavailable" role="group" aria-label="Puu, 0 kpl">
+            <svg class="icon" aria-hidden="true"><use href="#i-wood"/></svg><span class="material-name">Puu</span><span id="wood-count" class="item-count">0</span>
+          </div>
+          <div id="slot-stone" class="slot material-slot unavailable" role="group" aria-label="Kivi, 0 kpl">
+            <svg class="icon" aria-hidden="true"><use href="#i-stone"/></svg><span class="material-name">Kivi</span><span id="stone-count" class="item-count">0</span>
+          </div>
+          <button type="button" id="slot-axe" class="slot tool-slot unavailable" aria-label="Kirves, ei vielä löydetty" title="Pilko runko (7)">
+            <kbd>7</kbd><img class="tool-art" src="assets/axe.webp" alt="" draggable="false"><span>Kirves</span>
+          </button>
+          <button type="button" id="slot-flame" class="slot tool-slot unavailable" aria-label="Soihtu" title="Tee tai sytytä soihtu (8). Tarvitset yhden puun.">
+            <kbd>8</kbd><img class="tool-art" src="assets/hand-torch.webp" alt="" draggable="false"><span>Soihtu</span>
+          </button>
+          <div id="slot-wool" class="slot craft-slot unavailable" role="group" aria-label="Villa, 0 kpl">
+            <svg class="icon" aria-hidden="true"><use href="#i-wool"/></svg><span>Villa</span><span id="wool-count" class="material-count">0</span>
+          </div>
+          <div id="keycard-slot" class="slot craft-slot" role="group" aria-label="Kulkukortti" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-keycard"/></svg><span>Kulkukortti</span>
+          </div>
+          <button type="button" id="place-flame" class="slot craft-slot" hidden>
+            <kbd>G</kbd><svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg><span id="place-flame-label">Aseta soihtu</span>
+          </button>
+          <button type="button" id="build-fire" class="slot craft-slot unavailable" aria-label="Tee nuotio" aria-describedby="fire-recipe" title="Tee nuotio (C)">
+            <kbd>C</kbd><svg class="icon" aria-hidden="true"><use href="#i-campfire"/></svg><span>Tee nuotio</span>
+            <span id="fire-recipe" class="fire-recipe">2 puuta ja 1 kivi</span>
+          </button>
+        </div>
+        <div id="expedition-stock" class="expedition-stock" aria-label="Eräruokien ainekset" hidden>
+          <span id="trail-count-herbs" hidden></span>
+          <span id="trail-count-nuts" hidden></span>
+          <span id="trail-count-sap" hidden></span>
+          <span id="trail-count-honey" hidden></span>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <dialog id="expedition-dialog" class="dialog craft-dialog" aria-labelledby="expedition-title">
+    <div class="map-dialog-header">
+      <h2 id="expedition-title">Löytöpäiväkirja</h2>
+      <form method="dialog">
+        <button class="icon-button" type="submit" aria-label="Sulje löytöpäiväkirja"><svg class="icon"><use href="#i-close"/></svg></button>
+      </form>
+    </div>
+    <div class="expedition-totals">
+      <div><span>Löytöpaikat</span><strong id="expedition-sites-count"></strong></div>
+      <div><span>Eläinhavainnot</span><strong id="expedition-wildlife-count"></strong></div>
+      <div><span>Valmistetut eräruoat</span><strong id="expedition-recipes-count"></strong></div>
+    </div>
+    <label class="expedition-region">Alue <select id="expedition-region"></select></label>
+    <p id="expedition-local"></p>
+    <p id="expedition-sightings" class="expedition-sightings"></p>
+    <div id="expedition-findings" class="expedition-findings"></div>
+  </dialog>
+
+  <dialog id="recording-dialog" class="dialog recording-dialog" aria-labelledby="recording-title">
+    <div class="map-dialog-header">
+      <h2 id="recording-title">Mökin tallenne</h2>
+      <form method="dialog">
+        <button class="icon-button" type="submit" aria-label="Takaisin mökkiin"><svg class="icon"><use href="#i-close"/></svg></button>
+      </form>
+    </div>
+    <video id="cabin-recording" aria-label="Mökin tallenne" controls playsinline preload="none">
+      <source src="assets/mokin-tallenne.mp4?v=13" type="video/mp4">
+      <source id="recording-fallback-source" src="assets/mokin-tallenne.webm?v=13" type="video/webm">
+      <track src="assets/mokin-tallenne.vtt?v=13" kind="captions" srclang="fi" label="Suomi">
+    </video>
+    <p id="recording-status" class="recording-status" role="status"></p>
+  </dialog>
+
+  <dialog id="craft-dialog" class="dialog craft-dialog" aria-labelledby="craft-title">
+    <div class="map-dialog-header">
+      <div>
+        <h2 id="craft-title">Rakentaminen</h2>
+        <p id="craft-supplies"></p>
+      </div>
+      <form method="dialog">
+        <button class="icon-button" type="submit" aria-label="Sulje rakentaminen"><svg class="icon"><use href="#i-close"/></svg></button>
+      </form>
+    </div>
+    <div class="craft-tabs" role="group" aria-label="Reseptit">
+      <button class="game-button" type="button" data-recipes="build" aria-pressed="true">Maastoon</button>
+      <button class="game-button" type="button" data-recipes="food" aria-pressed="false">Ruoka</button>
+      <button class="game-button" type="button" data-recipes="trail" aria-pressed="false">Eräruoat</button>
+      <button class="game-button" type="button" data-recipes="gear" aria-pressed="false">Varusteet</button>
+    </div>
+    <div id="trail-filters" class="trail-filters" hidden>
+      <label>Hae eräruokaa <input id="trail-search" type="search" autocomplete="off"></label>
+      <label><input id="trail-ready" type="checkbox"> Vain valmistettavat ja repussa olevat</label>
+    </div>
+    <p id="craft-feedback" class="craft-feedback" role="status"></p>
+    <div id="craft-recipes" class="craft-recipes"></div>
+  </dialog>
+
+  <dialog id="map-dialog" class="dialog world-map" aria-labelledby="map-title" aria-describedby="map-instructions">
+    <div class="map-dialog-header">
+      <div>
+        <h2 id="map-title">Erämaakartta</h2>
+        <p id="map-instructions">Aseta reittimerkki valitsemalla kartalta kohde.</p>
+      </div>
+      <form method="dialog">
+        <button class="icon-button" type="submit" aria-label="Sulje kartta"><svg class="icon"><use href="#i-close"/></svg></button>
+      </form>
+    </div>
+    <div id="map-stage" class="map-stage">
+      <canvas id="map-overview" aria-hidden="true"></canvas>
+      <div id="map-regions" aria-hidden="true"></div>
+      <div id="map-landmarks" role="group" aria-label="Kartan suojat ja maamerkit"></div>
+      <span class="map-north" aria-hidden="true"><svg class="icon"><use href="#i-direction"/></svg>P</span>
+      <span id="map-position" class="map-position" title="Sijaintisi"></span>
+      <span id="map-route-pin" class="map-route-pin" hidden aria-hidden="true"><svg class="icon"><use href="#i-pin"/></svg></span>
+    </div>
+    <div class="map-dialog-footer">
+      <span><i class="map-key-position"></i> Sijaintisi</span>
+      <span><i class="map-key-shelter"></i> Suoja tai maamerkki</span>
+      <button id="clear-map-pin" type="button" class="help-button" hidden>Poista reittimerkki</button>
+    </div>
+  </dialog>
+
+  <dialog id="dialog" class="dialog" aria-labelledby="dialog-title" aria-describedby="dialog-copy">
+    <form method="dialog" class="dialog-body">
+      <button id="dialog-close" class="icon-button dialog-close" aria-label="Sulje" value="continue"><svg class="icon"><use href="#i-close"/></svg></button>
+      <span class="dialog-emblem"><svg class="icon"><use id="dialog-icon" href="#i-logo"/></svg></span>
+      <h2 id="dialog-title"></h2>
+      <p id="dialog-copy"></p>
+      <div id="help-detail" class="help-detail" hidden>
+        <div><kbd>WASD / nuolet</kbd><span>Liiku. Voit myös klikata maastoa.</span></div>
+        <div><kbd>Shift</kbd><span>Juokse, kun jaksamista riittää.</span></div>
+        <div><kbd>E</kbd><span>Toimi kohteen lähellä tai klikkaa sen merkkiä.</span></div>
+        <div><kbd>E</kbd><span>Keritse lammas laitumella. Sänkyyn tarvitaan kolme puuta ja kaksi villaa.</span></div>
+        <div><kbd>M</kbd><span>Avaa erämaakartta ja merkitse kohde.</span></div>
+        <div><kbd>B</kbd><span>Avaa rakentamisvalikko. Käytä maastoon asetettuja esineitä painamalla E.</span></div>
+        <div><kbd>J</kbd><span>Selaa löytöjä ja eläinhavaintoja löytöpäiväkirjassa.</span></div>
+        <div><kbd>1–8</kbd><span>Käytä repun tavaroita. <kbd>F</kbd> sytyttää taskulampun.</span></div>
+        <div><kbd>E / 6</kbd><span>Kalasta lammella ja syö saalis repusta.</span></div>
+        <div><kbd>C</kbd><span>Tee nuotio ulkona. Tarvitset kaksi puuta ja kiven.</span></div>
+        <div><kbd>7</kbd><span>Pilko runko puuvajan kirveellä.</span></div>
+        <div><kbd>8 / G</kbd><span>Tee soihtu yhdestä puusta ja aseta se maahan. Soihtu palaa pysyvästi. Poimi se painamalla E.</span></div>
+        <div><kbd>E</kbd><span>Autotalli on Itämetsässä. Nouse autoon tai poistu pysähdyksissä. Aja WASD:llä tai nuolilla ja jarruta välilyönnillä.</span></div>
+        <div><kbd>E</kbd><span>Nouse veneeseen rannalta. Napauta vettä tai souda WASD:llä tai nuolilla. Napauta rantautumismerkkiä palataksesi maihin.</span></div>
+      </div>
+      <div class="dialog-actions">
+        <button id="dialog-main" type="submit" value="continue" class="game-button primary">Jatka</button>
+        <button id="dialog-restart" type="submit" value="restart" class="game-button">Aloita alusta</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
