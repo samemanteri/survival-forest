@@ -53,6 +53,7 @@ const recipeGroups = { build: construction, food: cooking, gear: equipment, trai
 const ingredientNames = {
   wood: "puuta", stone: "kiveä", wool: "villaa", water: "vettä", bandage: "sidettä", berries: "marjoja", mushrooms: "sieniä", fish: "kalaa",
   ...Object.fromEntries(Object.entries(expeditionIngredients).map(([item, material]) => [item, material.amount])),
+  ...Object.fromEntries(fieldMaterials.map(material => [material.id, material.amount])),
 };
 const meterNames = { hunger: "kylläisyyttä", thirst: "nesteytystä", energy: "jaksamista", health: "terveyttä" };
 const stationNames = { oven: "Kiviuuni", bench: "Työpöytä", "dry-rack": "Kuivausteline" };
@@ -60,12 +61,13 @@ const craftingDialog = document.getElementById("craft-dialog");
 let recipeGroup = "build";
 
 function gearBonus(stat) {
-  return state?.gearBonus?.[stat] ?? 0;
+  const temporary = state?.fieldBuffs.get(stat);
+  return (state?.gearBonus?.[stat] ?? 0) + (temporary && temporary.until > state.minutes ? temporary.strength : 0);
 }
 
 function equipGear(id, bonuses) {
   state.gear.add(id);
-  for (const [stat, amount] of Object.entries(bonuses)) state.gearBonus[stat] = gearBonus(stat) + amount;
+  for (const [stat, amount] of Object.entries(bonuses)) state.gearBonus[stat] = (state.gearBonus[stat] ?? 0) + amount;
 }
 
 function onFootOutdoors() {
@@ -145,6 +147,16 @@ function craftRecipe(recipe) {
 
 function useCrafted(recipe) {
   if (!state.crafted.get(recipe.id)) return;
+  if (recipe.buff) {
+    const { stat, strength } = recipe.buff;
+    const until = state.minutes + recipe.duration;
+    if (state.fieldBuffs.get(stat)?.until >= until) return setText("craft-feedback", "Vastaava varuste on jo käytössä yhtä pitkään.");
+    state.fieldBuffs.set(stat, { strength, until, name: recipe.name });
+    state.crafted.set(recipe.id, state.crafted.get(recipe.id) - 1);
+    playSound(460);
+    renderCrafting(recipe.name + " on käytössä " + recipe.duration + " peliminuuttia.");
+    return;
+  }
   const effects = { ...recipe.restore };
   if (recipe.group === "food" && gearBonus("mealEnergy")) effects.energy = (effects.energy ?? 0) + gearBonus("mealEnergy");
   const canRestore = Object.keys(effects).some((meter) => meter === "battery"
@@ -256,14 +268,24 @@ function renderCrafting(message = "") {
   const fragment = document.createDocumentFragment();
   setText("craft-feedback", message);
   const trail = recipeGroup === "trail";
+  const field = recipeGroup === "field";
   byId("trail-filters").hidden = !trail;
+  byId("field-recipe-filters").hidden = !field;
+  const material = field ? selectedMaterial("field-recipe-material") : null;
+  if (material) {
+    const active = [...state.fieldBuffs.values()].filter(buff => buff.until > state.minutes)
+      .map(buff => buff.name + " (" + Math.ceil(buff.until - state.minutes) + " min)");
+    setText("field-recipe-stock", material.biome + " · Repussa " + state.pack[material.id] + " " + material.amount
+      + (active.length ? " · Käytössä " + active.join(", ") : ""));
+  }
   const term = trail ? byId("trail-search").value.trim().toLocaleLowerCase("fi") : "";
   const onlyReady = trail && byId("trail-ready").checked;
-  setText("craft-supplies", formatIngredients(Object.fromEntries(Object.keys(ingredientNames).map((item) => [item, state.pack[item]]))));
+  const supplies = Object.entries(state.pack).filter(([item, quantity]) => ingredientNames[item] && quantity > 0);
+  setText("craft-supplies", formatIngredients(Object.fromEntries(supplies)) || "Repussa ei ole aineksia.");
   for (const tab of document.querySelectorAll("[data-recipes]")) {
     tab.setAttribute("aria-pressed", String(tab.dataset.recipes === recipeGroup));
   }
-  for (const recipe of recipeGroups[recipeGroup]) {
+  for (const recipe of material ? material.recipes : recipeGroups[recipeGroup]) {
     const issue = recipeIssue(recipe);
     const count = state.crafted.get(recipe.id) ?? 0;
     if ((onlyReady && issue && !count) || (term && !recipe.name.toLocaleLowerCase("fi").includes(term))) continue;

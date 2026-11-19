@@ -477,7 +477,7 @@ button.slot:hover { border-color: #a5b297; background: #353f31; }
 .recipe .recipe-issue { color: #aab2a0; margin-top: 4px; }
 .recipe-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .recipe-actions .game-button { min-height: 30px; padding: 4px 8px; font-size: 12px; }
-.recipe-actions button:disabled { opacity: .56; cursor: default; }
+.recipe-actions button:disabled, .field-guide button:disabled { opacity: .56; cursor: default; }
 .trail-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 10px; }
 .trail-filters label, .expedition-region { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: 12px; color: #d8ddcb; }
 .trail-filters input[type="search"], .expedition-region select {
@@ -498,6 +498,11 @@ button.slot:hover { border-color: #a5b297; background: #353f31; }
 #expedition-local { margin-top: 7px; font-size: 12px; }
 .expedition-sightings { margin-top: 5px; font-size: 12px; color: var(--gold); }
 .expedition-sightings:empty { display: none; }
+.field-guide { margin-bottom: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; }
+.field-guide summary { cursor: pointer; font-weight: 700; }
+.field-guide summary span { margin-left: 6px; color: var(--gold); }
+.field-guide .expedition-region, .field-recipe-filters { margin-top: 10px; }
+#field-material-stock, #field-recipe-stock { margin: 6px 0; color: #c9d3bf; font-size: 13px; }
 .expedition-findings { display: grid; gap: 6px; margin-top: 11px; }
 .expedition-findings > p { color: #bfc9b6; font-size: 13px; }
 .expedition-entry { display: flex; align-items: center; justify-content: space-between; gap: 9px; padding: 9px; border: 1px solid var(--border); border-radius: 7px; background: #1b231a; }

@@ -100,7 +100,7 @@ const emptySites = [];
 const expeditionDialog = document.getElementById("expedition-dialog");
 
 function expeditionJournal() {
-  return { sites: new Set(), wildlife: new Set(), recipes: new Set(), ready: new Map() };
+  return { sites: new Set(), wildlife: new Set(), recipes: new Set(), fieldClaims: new Set(), ready: new Map() };
 }
 
 function expeditionRandom(seed) {
@@ -215,6 +215,7 @@ function makeExpeditionWorld() {
       });
     }
   }
+  placeFieldSites(existing);
   animalTypes.push(...expeditionAnimals);
 }
 
@@ -321,6 +322,15 @@ function bindExpedition() {
     regionSelect.append(option);
   }
   regionSelect.addEventListener("change", renderExpeditionJournal);
+  populateFieldSelect(byId("field-material"));
+  populateFieldSelect(byId("field-recipe-material"));
+  byId("field-material").addEventListener("change", renderFieldTasks);
+  byId("field-recipe-material").addEventListener("change", () => renderCrafting());
+  byId("field-open-recipes").addEventListener("click", () => {
+    byId("field-recipe-material").value = byId("field-material").value;
+    expeditionDialog.close();
+    openCrafting("field");
+  });
   byId("open-expedition").addEventListener("click", openExpedition);
 }
 
@@ -336,12 +346,14 @@ function openExpedition() {
 function renderExpeditionJournal() {
   const log = state.expedition;
   const regionIndex = Number(byId("expedition-region").value);
-  const sites = expeditionSites.filter((point) => point.regionIndex === regionIndex && log.sites.has(point.id));
+  const regionalSites = expeditionSites.filter((point) => point.regionIndex === regionIndex);
+  const sites = regionalSites.filter((point) => log.sites.has(point.id));
   const observed = expeditionAnimals.filter((animal) => animal.regionIndex === regionIndex && log.wildlife.has(animal.observationId));
   setText("expedition-sites-count", log.sites.size + " / " + expeditionSites.length);
   setText("expedition-wildlife-count", log.wildlife.size + " / " + expeditionAnimals.length);
-  setText("expedition-recipes-count", log.recipes.size + " / " + expeditionRecipes.length);
-  setText("expedition-local", sites.length + " / " + SITES_PER_REGION + " löytöpaikkaa · " + observed.length + " / " + ANIMALS_PER_REGION + " eläinhavaintoa");
+  setText("expedition-recipes-count", log.recipes.size + " / " + (expeditionRecipes.length + fieldRecipes.length));
+  setText("expedition-local", sites.length + " / " + regionalSites.length + " löytöpaikkaa · " + observed.length + " / " + ANIMALS_PER_REGION + " eläinhavaintoa");
+  renderFieldTasks();
 
   const sightings = new Map();
   for (const animal of observed) sightings.set(animal.name, (sightings.get(animal.name) ?? 0) + 1);

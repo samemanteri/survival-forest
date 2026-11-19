@@ -223,3 +223,7 @@ Production transparent sprite atlas, a 4-column by 3-row grid (twelve separate f
 animal-gaits.webp
 
 Eläinten askelsarjat on animoitu pelin alkuperäisistä eläinkuvista. Liikeradat perustuvat kunkin eläimen jalkojen ja vartalon asentoon.
+
+field-fruit.webp, field-grain.webp, field-herbs.webp, field-cloth.webp
+
+Game prop sprite atlas, 2 columns by 2 rows, precisely four separate isolated objects in equal square cells with generous clear gutters. Realistic hand-painted Finnish woodland survival game, steep overhead three-quarter view. Top left: shallow round birch-bark basket heaped with small red, golden and blue berries, a few leaves. Top right: an open ochre linen grain sack with golden grain and two tawny seed heads. Bottom left: a fresh bundle of several aromatic green herbs with tiny pale flowers and a thin twine tie, arranged diagonally. Bottom right: a small stack of folded indigo, cream and brown fabrics tied with cord. Same scale, strong silhouette, angled warm afternoon light, tactile materials, natural colors. Each object centered entirely inside its cell, transparent background, no ground, no cast shadows beyond objects, no text, no grid lines, no symbols.

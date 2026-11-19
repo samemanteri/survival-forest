@@ -6,6 +6,7 @@ const START_TIME = 17 * 60 + 40;
 const DAWN = 6 * 60;
 const MINUTES_PER_SECOND = 6;
 const USE_RANGE = 47;
+const PLAYER_SPAWN = { x: 510, y: 491 };
 const FISHING_WAIT = 3;
 const FIRE_RADIUS = 145;
 const FIRE_DURATION = 42;
@@ -414,9 +415,10 @@ function reset() {
     started: false,
     elapsed: 0,
     minutes: START_TIME,
-    player: { x: 510, y: 491, angle: -Math.PI / 2, gait: createGait("hiker") },
+    player: { ...PLAYER_SPAWN, angle: -Math.PI / 2, gait: createGait("hiker") },
     meters: { health: 100, hunger: 74, thirst: 68, energy: 90 },
-    pack: { berries: 0, water: 1, bandage: 0, mushrooms: 0, fish: 0, wood: 0, stone: 0, wool: 0,
+    pack: { ...Object.fromEntries(fieldMaterials.map(material => [material.id, 0])),
+      berries: 0, water: 1, bandage: 0, mushrooms: 0, fish: 0, wood: 0, stone: 0, wool: 0,
       herbs: 0, nuts: 0, sap: 0, honey: 0, torch: false, battery: 100, light: false, axe: false, flame: false, flameOn: false, keycard: false },
     animals: animalTypes.map((type, index) => {
       const home = animalHome(type.x, type.y);
@@ -443,6 +445,7 @@ function reset() {
     crafted: new Map(),
     gear: new Set(),
     gearBonus: {},
+    fieldBuffs: new Map(),
     nextBuild: 1,
     campfire: null,
     flamePlaced: false,

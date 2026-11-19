@@ -6,17 +6,18 @@
   <meta name="theme-color" content="#171b16">
   <title>Korpi – Metsäselviytyminen</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=17">
   <script src="terrain-map.js?v=7" defer></script>
   <script src="tree-collision.js?v=8" defer></script>
   <script src="character-motion.js?v=1" defer></script>
-  <script src="view-loader.js?v=18" defer></script>
-  <script src="expedition.js?v=14" defer></script>
-  <script src="crafting.js?v=15" defer></script>
+  <script src="view-loader.js?v=19" defer></script>
+  <script src="expedition.js?v=15" defer></script>
+  <script src="fieldwork.js?v=1" defer></script>
+  <script src="crafting.js?v=16" defer></script>
   <script src="weather.js?v=12" defer></script>
   <script src="mystery.js?v=12" defer></script>
   <script src="cabin-search.js?v=15" defer></script>
-  <script src="game.js?v=18" defer></script>
+  <script src="game.js?v=19" defer></script>
 </head>
 <body>
   <svg class="symbol-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -310,8 +311,18 @@
     <div class="expedition-totals">
       <div><span>Löytöpaikat</span><strong id="expedition-sites-count"></strong></div>
       <div><span>Eläinhavainnot</span><strong id="expedition-wildlife-count"></strong></div>
-      <div><span>Valmistetut eräruoat</span><strong id="expedition-recipes-count"></strong></div>
+      <div><span>Kokeillut reseptit</span><strong id="expedition-recipes-count"></strong></div>
     </div>
+    <details class="field-guide" open>
+      <summary>Keruutehtävät <span id="field-task-count"></span></summary>
+      <label class="expedition-region">Raaka-aine <select id="field-material"></select></label>
+      <p id="field-material-stock"></p>
+      <div class="craft-tabs">
+        <button class="game-button" type="button" id="field-mark">Merkitse lähin löytämätön keruupaikka</button>
+        <button class="game-button" type="button" id="field-open-recipes">Näytä reseptit</button>
+      </div>
+      <div id="field-tasks" class="expedition-findings"></div>
+    </details>
     <label class="expedition-region">Alue <select id="expedition-region"></select></label>
     <p id="expedition-local"></p>
     <p id="expedition-sightings" class="expedition-sightings"></p>
@@ -348,6 +359,11 @@
       <button class="game-button" type="button" data-recipes="food" aria-pressed="false">Ruoka</button>
       <button class="game-button" type="button" data-recipes="trail" aria-pressed="false">Eräruoat</button>
       <button class="game-button" type="button" data-recipes="gear" aria-pressed="false">Varusteet</button>
+      <button class="game-button" type="button" data-recipes="field" aria-pressed="false">Keruureseptit</button>
+    </div>
+    <div id="field-recipe-filters" class="field-recipe-filters" hidden>
+      <label class="expedition-region">Raaka-aine <select id="field-recipe-material"></select></label>
+      <p id="field-recipe-stock"></p>
     </div>
     <div id="trail-filters" class="trail-filters" hidden>
       <label>Hae eräruokaa <input id="trail-search" type="search" autocomplete="off"></label>
@@ -395,8 +411,8 @@
         <div><kbd>Hiiri</kbd><span>Vedä mökissä tavaroita sivuun. Ota paljastunut löytö klikkaamalla sitä.</span></div>
         <div><kbd>E</kbd><span>Keritse lammas laitumella. Sänkyyn tarvitaan kolme puuta ja kaksi villaa.</span></div>
         <div><kbd>M</kbd><span>Avaa erämaakartta ja merkitse kohde.</span></div>
-        <div><kbd>B</kbd><span>Avaa rakentamisvalikko. Käytä maastoon asetettuja esineitä painamalla E.</span></div>
-        <div><kbd>J</kbd><span>Selaa löytöjä ja eläinhavaintoja löytöpäiväkirjassa.</span></div>
+        <div><kbd>B</kbd><span>Rakenna, tee keruuresepteistä ruokaa ja valmista varusteita. Käytä maastoon asetettuja esineitä painamalla E.</span></div>
+        <div><kbd>J</kbd><span>Merkitse keruupaikka kartalle, lunasta tehtäväpalkinnot ja selaa löytöjä sekä eläinhavaintoja.</span></div>
         <div><kbd>1–8</kbd><span>Käytä repun tavaroita. <kbd>F</kbd> sytyttää taskulampun.</span></div>
         <div><kbd>E / 6</kbd><span>Kalasta lammella ja syö saalis repusta.</span></div>
         <div><kbd>C</kbd><span>Tee nuotio ulkona. Tarvitset kaksi puuta ja kiven.</span></div>
