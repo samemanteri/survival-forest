@@ -63,6 +63,11 @@ function gearBonus(stat) {
   return state?.gearBonus?.[stat] ?? 0;
 }
 
+function equipGear(id, bonuses) {
+  state.gear.add(id);
+  for (const [stat, amount] of Object.entries(bonuses)) state.gearBonus[stat] = gearBonus(stat) + amount;
+}
+
 function onFootOutdoors() {
   return !state.shelter && !state.onTower && !state.car.driving && !state.boat.aboard;
 }
@@ -129,8 +134,7 @@ function craftRecipe(recipe) {
     craftingDialog.close();
     notice(recipe.name + " on valmis", recipe.action + " painamalla E kohteen vieressä.", point.icon);
   } else if (recipe.bonus) {
-    state.gear.add(recipe.id);
-    for (const [stat, amount] of Object.entries(recipe.bonus)) state.gearBonus[stat] = gearBonus(stat) + amount;
+    equipGear(recipe.id, recipe.bonus);
   } else {
     state.crafted.set(recipe.id, (state.crafted.get(recipe.id) ?? 0) + 1);
     if (recipe.expedition) state.expedition.recipes.add(recipe.id);

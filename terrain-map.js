@@ -19,8 +19,19 @@ const WORLD_BOTTOM = WORLD_TOP + REGION_HEIGHT * 3;
 const WIDTH = WORLD_RIGHT - WORLD_LEFT;
 const HEIGHT = WORLD_BOTTOM - WORLD_TOP;
 
+const terrainBiomes = {
+  spruce: { label: "Taiga", file: "expanse-spruce.webp", secondary: "birch" },
+  birch: { label: "Metsä", file: "expanse-birch.webp", secondary: "spruce" },
+  ridge: { label: "Metsä", file: "expanse-ridge.webp", secondary: "birch" },
+  bog: { label: "Metsä", file: "expanse-bog.webp", secondary: "ridge" },
+  snow: { label: "Lumialue", file: "expanse-snow.webp" },
+  jungle: { label: "Viidakko", file: "expanse-jungle.webp" },
+  savanna: { label: "Savanni", file: "expanse-savanna.webp", thirst: 1.25 },
+  desert: { label: "Aavikko", file: "expanse-desert.webp", thirst: 1.65 },
+};
+
 const backcountry = [
-  { name: "Hallanharju", biome: "ridge", hut: [-4140, -1720], label: "Hallanharjun tupa" },
+  { name: "Hallanharju", biome: "snow", hut: [-4140, -1720], label: "Hallanharjun tupa" },
   { name: "Kuurakuusikko", biome: "spruce", hut: [-1380, -1410], label: "Kuurakuusikon kämppä" },
   { name: "Pohjoiskangas", biome: "birch", hut: [1660, -1490], label: "Pohjoiskankaan tupa" },
   { name: "Katajaharju", biome: "ridge", hut: [4510, -1630], label: "Katajaharjun maja" },
@@ -29,18 +40,26 @@ const backcountry = [
   { name: "Järvikangas", biome: "spruce", hut: [-1530, 1520], label: "Järvikankaan tupa" },
   { name: "Metsäniitty", biome: "ridge", hut: [1670, 2210], label: "Niittymaja" },
   { name: "Idän korpi", biome: "spruce", hut: [4630, 1260], label: "Korven kämppä" },
-  { name: "Tuuliharju", biome: "ridge", hut: [7420, 1510], label: "Tuuliharjun tupa" },
-  { name: "Saniaislaakso", biome: "spruce", hut: [-4010, 4610], label: "Saniaismaja" },
+  { name: "Tuuliharju", biome: "savanna", hut: [7420, 1510], label: "Tuuliharjun tupa" },
+  { name: "Saniaislaakso", biome: "jungle", hut: [-4010, 4610], label: "Saniaismaja" },
   { name: "Ruskarinne", biome: "birch", hut: [-1130, 4320], label: "Ruskarinteen tupa" },
   { name: "Kanervakangas", biome: "ridge", hut: [1740, 4580], label: "Kanervakämppä" },
-  { name: "Nevakorpi", biome: "bog", hut: [4540, 4370], label: "Nevakorven tupa" },
-  { name: "Pitkäneva", biome: "bog", hut: [7330, 4550], label: "Pitkänevan maja" },
+  { name: "Kulta-aro", biome: "savanna", hut: [4540, 4370], label: "Kulta-aron tupa" },
+  { name: "Hiekkaselkä", biome: "desert", hut: [7330, 4550], label: "Hiekkaselän maja" },
 ];
+
+function insideCore(x, y) {
+  return x >= CORE.x && x < CORE.x + CORE.width && y >= CORE.y && y < CORE.y + CORE.height;
+}
 
 function backcountryRegion(x, y) {
   const column = Math.max(0, Math.min(4, Math.floor((x - WORLD_LEFT) / REGION_WIDTH)));
   const row = Math.max(0, Math.min(2, Math.floor((y - WORLD_TOP) / REGION_HEIGHT)));
   return backcountry[row * 5 + column];
+}
+
+function biomeAt(x, y) {
+  return insideCore(x, y) ? "birch" : backcountryRegion(x, y).biome;
 }
 
 function terrainVariation(column, row) {
@@ -52,8 +71,8 @@ function outlyingTile(column, row) {
   const y = WORLD_TOP + row * TILE_HEIGHT;
   const { biome } = backcountryRegion(x + TILE_WIDTH / 2, y + TILE_HEIGHT / 2);
   const variation = terrainVariation(column, row);
-  const secondary = { spruce: "birch", birch: "spruce", bog: "ridge", ridge: "birch" };
-  return { x, y, biome: variation % 5 === 0 ? secondary[biome] : biome, variant: (column + row + 2 * variation) % 4 };
+  const secondary = terrainBiomes[biome].secondary;
+  return { x, y, biome: variation % 5 === 0 && secondary ? secondary : biome, variant: (column + row + 2 * variation) % 4 };
 }
 
 function terrainCrop(variant) {

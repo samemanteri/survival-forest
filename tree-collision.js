@@ -70,6 +70,18 @@ const treeFootprints = {
     [12.7, 34, 18], [17.2, 33.6, 23, 308], [28.4, 33.2, 18], [61.9, 13.4, 15], [86.6, 13.6, 16],
     [82.7, 39.7, 19, 183], [93, 42.1, 17], [4.4, 61.1, 16], [27.1, 60.2, 15], [81.3, 73.2, 23, 222],
   ],
+  snow: [
+    [6.7, 14.8, 14, 113], [50.6, 12.2, 13, 139], [73.9, 20.4, 17, 192], [87.8, 34.5, 12, 98],
+    [92.7, 34.2, 13, 149], [31.3, 44.2, 15, 152], [11.6, 56.2, 12, 93], [78.3, 61.6, 10, 77],
+    [86.8, 63.6, 16, 190], [25, 80.6, 16, 155], [93.6, 92.5, 12, 106],
+  ],
+  jungle: [
+    [23.7, 24, 19, 300], [65.3, 32.2, 26, 345], [90.4, 43.4, 19, 330],
+    [8.1, 65.2, 25, 430], [31.6, 87.2, 20, 300], [73.9, 91.6, 26, 450],
+  ],
+  savanna: [
+    [27, 19.6, 22, 185], [86.7, 28.8, 23, 207], [20.4, 55, 24, 218], [81.3, 72.4, 24, 219],
+  ],
 };
 
 const crownProportions = {
@@ -80,6 +92,9 @@ const crownProportions = {
   birch: [1.61, 7.8],
   ridge: [1.27, 4.8],
   bog: [1.2, 4.1],
+  snow: [1.65, 5.5],
+  jungle: [3.1, 7.8],
+  savanna: [3.8, 5.3],
 };
 
 function treeShape(x, y, radius, biome, height) {
@@ -128,7 +143,7 @@ function placeTreeTrunks() {
     const { size, left, top, flip } = terrainCrop(tile.variant);
     const overlapping = tiles.slice(index + 1).filter((other) => other.x < tile.x + tile.width
       && other.x + other.width > tile.x && other.y < tile.y + tile.height);
-    for (const [imageX, imageY, radius, height] of treeFootprints[tile.biome]) {
+    for (const [imageX, imageY, radius, height] of treeFootprints[tile.biome] ?? []) {
       const u = (imageX / 100 - left) / size;
       const v = (imageY / 100 - top) / size;
       const x = tile.x + (flip ? 1 - u : u) * tile.width;

@@ -25,7 +25,8 @@ const mapDialog = byId("map-dialog");
 const mapStage = byId("map-stage");
 const fishingOverlay = byId("fishing-overlay");
 const camera = { x: 0, y: 0, width: VIEW_WIDTH, height: VIEW_HEIGHT, scale: 1 };
-const keys = new Set();
+// Keep a short press available until the next simulation step has seen it.
+const keys = new Map();
 const driveTouches = new Map();
 const moves = {
   KeyW: [0, -1], ArrowUp: [0, -1],
@@ -79,7 +80,7 @@ const extraShelters = [
   ["juniper-lodge", "Katajaharjun taukotupa", 4790, -690, "rest"],
   ["bog-hut", "Suonvartijan maja", 6850, -650, "fishing"],
   ["heather-aid", "Kanervakankaan ensiaputupa", 2540, 4980, "aid"],
-  ["moor-lodge", "Pitkänevan taukotupa", 6275, 3790, "rest"],
+  ["moor-lodge", "Hiekkaselän taukotupa", 6275, 3790, "rest"],
 ].map(([id, label, x, y, type]) => ({
   ...buildingTypes[type], id, label, x, y, action: "Mene suojaan", labelY: y + 22,
   base: { x: x + 20, y: y - 10 },
@@ -193,10 +194,11 @@ function backcountrySupplies() {
   for (let row = 0; row < HEIGHT / TILE_HEIGHT; row++) {
     for (let column = 0; column < WIDTH / TILE_WIDTH; column++) {
       const variation = terrainVariation(column, row);
-      const left = WORLD_LEFT + column * TILE_WIDTH;
-      const top = WORLD_TOP + row * TILE_HEIGHT;
+      const { x: left, y: top, biome } = outlyingTile(column, row);
       const dropTypes = ["berries", "wood", "stone", variation % 3 === 0 ? "log" : "mushrooms"];
       for (const [index, kind] of dropTypes.entries()) {
+        if (biome === "desert" && kind !== "stone") continue;
+        if (biome === "snow" && (kind === "berries" || kind === "mushrooms")) continue;
         const x = left + 220 + (index % 2) * 720 + (variation * (index + 3) % 215);
         const y = top + 150 + Math.floor(index / 2) * 510 + (variation * (index + 5) % 190);
         if (x > CORE.x - 100 && x < CORE.x + CORE.width + 100 && y > -100 && y < CORE.height + 100) continue;
@@ -252,7 +254,7 @@ const [wolf, bear, moose] = animalTypes;
 for (const [index, { hut: [x, y], biome }] of backcountry.entries()) {
   const direction = index % 2 === 0 ? 1 : -1;
   animalTypes.push({ ...moose, x: x + direction * 580, y: y + 390, roam: 155 });
-  animalTypes.push({ ...(biome === "ridge" || index % 3 === 0 ? wolf : bear), x: x - direction * 640, y: y - 450, roam: 145 });
+  animalTypes.push({ ...(biome === "ridge" || biome === "snow" || index % 3 === 0 ? wolf : bear), x: x - direction * 640, y: y - 450, roam: 145 });
   animalTypes.push({ ...[hare, fox, roeDeer][index % 3], x: x + direction * 465, y: y - 280 });
   animalTypes.push({ ...[roeDeer, hare, fox][index % 3], x: x - direction * 585, y: y + 400 });
 }
@@ -310,10 +312,13 @@ function positionOnMap(element, { x, y }) {
 
 function createWorldMap() {
   view.drawOverview(byId("map-overview"));
-  for (const { name } of backcountry) {
-    const label = document.createElement("span");
+  for (const { name, biome } of backcountry) {
+    const label = document.createElement("div");
+    const biomeLabel = document.createElement("small");
     label.className = "map-region";
-    label.textContent = name;
+    label.dataset.biome = biome;
+    biomeLabel.textContent = terrainBiomes[biome].label;
+    label.append(name, biomeLabel);
     byId("map-regions").append(label);
   }
   for (const point of [shelters[0], tower, garage, sheepMeadow, ...backcountry.map(({ shelter }) => shelter), ...extraShelters]) registerMapMarker(point);
@@ -409,14 +414,15 @@ function reset() {
     started: false,
     elapsed: 0,
     minutes: START_TIME,
-    player: { x: 510, y: 491, angle: -Math.PI / 2, facing: 1 },
+    player: { x: 510, y: 491, angle: -Math.PI / 2, gait: createGait("hiker") },
     meters: { health: 100, hunger: 74, thirst: 68, energy: 90 },
     pack: { berries: 0, water: 1, bandage: 0, mushrooms: 0, fish: 0, wood: 0, stone: 0, wool: 0,
       herbs: 0, nuts: 0, sap: 0, honey: 0, torch: false, battery: 100, light: false, axe: false, flame: false, flameOn: false, keycard: false },
     animals: animalTypes.map((type, index) => {
       const home = animalHome(type.x, type.y);
-      return { ...type, ...home, home, ...animalSprites[index], angle: index * 2.5, facing: 1, chase: false, moving: false, regrowAt: 0 };
+      return { ...type, ...home, home, ...animalSprites[index], angle: index * 2.5, gait: createGait(type.id, index * .618), chase: false, regrowAt: 0 };
     }),
+    hens: henPositions.map((_, index) => ({ ...henPosition(index, 0), gait: createGait("hen", index / 3) })),
     waypoints: [],
     targetPoint: null,
     pointer: null,
@@ -429,6 +435,7 @@ function reset() {
     cabinVisited: false,
     recordingSeen: false,
     collected: new Set(),
+    cabinSearches: new Map(),
     expedition: expeditionJournal(),
     resting: false,
     campRest: null,
@@ -456,6 +463,7 @@ function reset() {
   keys.clear();
   driveTouches.clear();
   byId("touch-run").setAttribute("aria-pressed", "false");
+  renderCabinGear();
   resizeView();
   render();
 }
@@ -746,7 +754,7 @@ function leaveBoat() {
 function startFishing(point) {
   state.started = true;
   state.fishing = { point, readyAt: state.elapsed + FISHING_WAIT };
-  state.player.facing = -1;
+  Object.assign(state.player.gait, { facing: -1, directionRow: 0 });
   state.message = null;
   playSound(290);
 }
@@ -970,7 +978,7 @@ function useItem(item) {
     mushrooms: { meter: "hunger", restore: 20, title: "Söit ruokasieniä", empty: "Etsi metsästä ruokasieniä.", icon: "mushrooms" },
     fish: { meter: "hunger", restore: 35, title: "Söit ahvenen", empty: "Kalasta metsälammella.", icon: "fish" },
     water: { meter: "thirst", restore: 29 + gearBonus("drinkBonus"), title: "Joit vettä", empty: "Täytä juomapullo padasta, kaivosta tai lammelta.", icon: "drop" },
-    bandage: { meter: "health", restore: 35, title: "Sidoit haavat", empty: "Etsi ensiaputarvikkeita vajasta.", icon: "bandage" },
+    bandage: { meter: "health", restore: 35 + gearBonus("bandageHealing"), title: "Sidoit haavat", empty: "Etsi ensiaputarvikkeita vajasta.", icon: "bandage" },
   };
   const info = items[item];
   if (!pack[item]) return notice("Repussa ei ole tarviketta", info.empty, info.icon);
@@ -1084,7 +1092,7 @@ function stepBoat(dt) {
 function stepPlayer(dt) {
   let dx = 0;
   let dy = 0;
-  for (const key of keys) {
+  for (const key of keys.keys()) {
     if (!moves[key]) continue;
     dx += moves[key][0];
     dy += moves[key][1];
@@ -1125,7 +1133,6 @@ function stepPlayer(dt) {
   const nextX = player.x + dx * scale;
   const nextY = player.y + dy * scale;
   player.angle = Math.atan2(dy, dx);
-  if (Math.abs(dx) > .05) player.facing = dx < 0 ? -1 : 1;
   const prevX = player.x;
   const prevY = player.y;
   if (state.waypoints.length && traversable(nextX, nextY)) {
@@ -1149,13 +1156,14 @@ function stepAnimals(dt) {
     const gap = distance(animal, player);
     if (animal.observationId) {
       if (gap > 1050 || !expeditionAnimalAwake(animal)) {
-        animal.moving = false;
+        animal.gait.speed = 0;
+        animal.gait.vx = animal.gait.vy = 0;
         continue;
       }
       observeExpeditionAnimal(animal, gap, exposed);
     }
     if (animal.id === "sheep" && exposed && (gap < 112 || state.targetPoint?.animalIndex === index)) {
-      animal.moving = false;
+      advanceGait(animal.gait, 0, 0, dt);
       continue;
     }
     const range = animal.detection + (animal.id === "wolf" ? dark * 59 : 0) - (animal.damage ? gearBonus("stealth") : 0);
@@ -1179,9 +1187,8 @@ function stepAnimals(dt) {
       const nextY = animal.y + dy / length * step;
       if (traversable(nextX, animal.y)) animal.x = nextX;
       if (traversable(animal.x, nextY)) animal.y = nextY;
-      if (Math.abs(dx) > 2) animal.facing = dx > 0 ? -1 : 1;
     }
-    animal.moving = animal.x !== prevX || animal.y !== prevY;
+    advanceGait(animal.gait, animal.x - prevX, animal.y - prevY, dt);
     if (animal.chase && gap < 23 && state.hitUntil <= state.elapsed) {
       if (state.campRest) stopRest();
       state.meters.health = Math.max(0, state.meters.health - animal.damage);
@@ -1191,16 +1198,31 @@ function stepAnimals(dt) {
   }
 }
 
+function henPosition(index, elapsed) {
+  const [x, y] = henPositions[index];
+  const angle = elapsed * (1.1 + index * .12) + index * 2;
+  return { x: chickenPen.base.x + x + Math.sin(angle) * 10, y: chickenPen.base.y + y + Math.cos(angle) * 5 };
+}
+
 function tick(dt) {
   state.moving = false;
   if (stepTunnel(dt)) return;
+  const prevX = state.player.x;
+  const prevY = state.player.y;
   if (state.car.driving) stepCar(dt);
   else if (state.boat.aboard) stepBoat(dt);
   else if (!state.shelter && !state.onTower) stepPlayer(dt);
   if (!state.started) return;
   if (!state.bunkerFound && onFootOutdoors() && distance(state.player, bunker) < 145) discoverBunker();
-  const { meters, pack } = state;
+  const { meters, pack, player, shelter, car } = state;
+  const onFoot = state.moving && onFootOutdoors();
+  advanceGait(player.gait, onFoot ? player.x - prevX : 0, onFoot ? player.y - prevY : 0, dt);
   state.elapsed += dt;
+  for (const [index, hen] of state.hens.entries()) {
+    const next = henPosition(index, state.elapsed);
+    advanceGait(hen.gait, next.x - hen.x, next.y - hen.y, dt);
+    Object.assign(hen, next);
+  }
   state.gateLift = clamp(state.gateLift + dt * (state.gateOpen ? 4 : -4), 0, 1);
   if (state.fishing && state.elapsed >= state.fishing.readyAt) {
     state.fishing = null;
@@ -1210,15 +1232,20 @@ function tick(dt) {
   }
   if (state.campfire?.until <= state.elapsed) state.campfire = null;
   state.minutes += dt * MINUTES_PER_SECOND * (state.resting ? 7 : 1);
-  const walking = state.moving && !state.car.driving;
+  const walking = state.moving && !car.driving;
+  const biome = biomeAt(player.x, player.y);
+  const outdoors = !shelter && !car.driving;
+  const byFire = nearCampfire();
+  const thirst = outdoors ? terrainBiomes[biome].thirst ?? 1 : 1;
+  const cold = outdoors && biome === "snow" && !byFire ? .9 : 0;
   meters.hunger = Math.max(0, meters.hunger - dt * (walking ? .31 : .19));
-  meters.thirst = Math.max(0, meters.thirst - dt * (walking ? .53 : .27));
-  const recovery = state.resting ? 7 + gearBonus("restBonus") : state.shelter ? 7 : walking ? .25 : nearCampfire() ? 5 : 2.4;
-  meters.energy = Math.min(100, meters.energy + dt * recovery);
+  meters.thirst = Math.max(0, meters.thirst - dt * (walking ? .53 : .27) * thirst);
+  const recovery = state.resting ? 7 + gearBonus("restBonus") : shelter ? 7 : walking ? .25 : byFire ? 5 : 2.4;
+  meters.energy = clamp(meters.energy + dt * (recovery - cold), 0, 100);
   if (meters.hunger === 0 || meters.thirst === 0) meters.health = Math.max(0, meters.health - 2.6 * dt);
   if (state.resting && meters.hunger > 20 && meters.thirst > 20) meters.health = Math.min(100, meters.health + dt * 1.6);
   if (pack.light && !state.shelter && !state.car.driving) {
-    pack.battery = Math.max(0, pack.battery - dt * 1.16);
+    pack.battery = Math.max(0, pack.battery - dt * (1.16 - gearBonus("torchEfficiency")));
     if (!pack.battery) {
       pack.light = false;
       notice("Taskulampun akku loppui", "Palaa suojaan.", "torch", "night");
@@ -1237,7 +1264,7 @@ function tick(dt) {
   }
 }
 
-function describeSituation() {
+function describeSituation(biome) {
   const message = state.message?.until > state.elapsed ? state.message : null;
   const threats = state.animals.filter((animal) => animal.chase);
   if (threats.length) {
@@ -1251,10 +1278,17 @@ function describeSituation() {
   if (state.boat.aboard) return { title: "Olet veneessä", copy: "Napauta vettä tai souda näppäimillä.", iconName: "boat" };
   if (state.onTower) return { title: "Olet vartiotornissa", copy: "Täältä näet kauemmas metsään.", iconName: "tower" };
   if (state.shelter) {
-    return { title: state.resting ? "Lepäät suojassa" : "Olet suojassa", copy: state.resting ? "Aika kuluu nopeammin." : "Eläimet jäävät ulos. Voit levätä täällä.", iconName: "house", style: "" };
+    const hint = cabinLayouts[state.shelter.image] ? "Siirrä tavaroita ja katso niiden alta." : "Eläimet jäävät ulos. Voit levätä täällä.";
+    return { title: state.resting ? "Lepäät suojassa" : "Olet suojassa", copy: state.resting ? "Aika kuluu nopeammin." : hint, iconName: "house", style: "" };
   }
   if (nearCampfire()) {
     return { title: "Nuotio palaa", copy: "Jaksaminen palautuu nopeammin, kun pysähdyt.", iconName: "campfire", style: "" };
+  }
+  if (biome === "snow") {
+    return { title: "Pakkanen vie voimia", copy: "Nuotio tai suoja auttaa palautumaan.", iconName: "snow", style: "" };
+  }
+  if (terrainBiomes[biome].thirst) {
+    return { title: "Kuumuus lisää janoa", copy: "Täytä juomapullo, kun löydät kaivon.", iconName: "drop", style: "" };
   }
   const dark = darkness();
   if (dark > .35) {
@@ -1290,7 +1324,7 @@ function resizeView() {
 }
 
 function region({ x, y }) {
-  if (x < CORE.x || x >= CORE.x + CORE.width || y < CORE.y || y >= CORE.y + CORE.height) return backcountryRegion(x, y).name;
+  if (!insideCore(x, y)) return backcountryRegion(x, y).name;
   if (x < 0) return "Korpijärvi";
   if (x >= 2000) return "Itämetsä";
   if (y > 800) return x < 950 ? "Saunapolku" : "Erämaankangas";
@@ -1314,7 +1348,7 @@ function renderFishing() {
 }
 
 function renderWorld(dark) {
-  const { player, animals, pack, elapsed, moving, campfire, onTower, car, boat } = state;
+  const { player, animals, pack, elapsed, campfire, onTower, car, boat } = state;
   const focus = onTower ? tower.base : player;
   camera.x = clamp(focus.x - camera.width / 2, WORLD_LEFT, WORLD_RIGHT - camera.width);
   camera.y = clamp(focus.y - camera.height * .68, WORLD_TOP, WORLD_BOTTOM - camera.height);
@@ -1322,20 +1356,18 @@ function renderWorld(dark) {
     && y >= camera.y - padding && y <= camera.y + camera.height + padding;
 
   view.positionSprite(playerSprite, player.x, player.y, {
-    facing: player.facing,
-    step: moving ? Math.abs(Math.sin(elapsed * 13)) * 3 : 0,
+    ...gaitPose(player.gait),
     brightness: 1 - dark * .42,
     visible: !onTower && !car.driving && !boat.aboard,
   });
   view.positionSprite(carSprite, car.x, car.y, { angle: car.angle, brightness: 1 - dark * .53, visible: !car.inGarage });
   view.positionSprite(boatSprite, boat.x, boat.y, { angle: boat.angle, step: Math.sin(elapsed * 3) * 1.2, brightness: 1 - dark * .6 });
-  view.positionSprite(flameSprite, player.x + player.facing * 17, player.y - 15, { visible: pack.flameOn && !onTower });
+  view.positionSprite(flameSprite, player.x + player.gait.turn * 17, player.y - 15, { visible: pack.flameOn && !onTower });
   for (const animal of animals) {
     const visible = inView(animal.x, animal.y, 110) && (!animal.observationId || expeditionAnimalAwake(animal));
     const shorn = animal.shornSprite && !hasWool(animal);
     const appearance = {
-      facing: animal.facing,
-      step: animal.moving ? Math.abs(Math.sin(elapsed * 12 + animal.home.x)) * (animal.id === "hare" ? 6 : 3) : 0,
+      ...(visible ? gaitPose(animal.gait) : null),
       brightness: 1 - dark * (animal.chase ? .44 : .68),
     };
     view.positionSprite(animal.sprite, animal.x, animal.y, { ...appearance, visible: visible && !shorn });
@@ -1378,11 +1410,9 @@ function renderWorld(dark) {
     }
   }
   view.positionSprite(gatePanelSprite, gate.base.x, gate.base.y - 1, { step: state.gateLift * 48, brightness: 1 - dark * .85 });
-  for (const [index, [x, y]] of henPositions.entries()) {
-    const angle = elapsed * (1.1 + index * .12) + index * 2;
-    view.positionSprite(henSprites[index], chickenPen.base.x + x + Math.sin(angle) * 10, chickenPen.base.y + y + Math.cos(angle) * 5, {
-      facing: Math.cos(angle) > 0 ? -1 : 1,
-      step: Math.abs(Math.sin(elapsed * 12 + index)) * 1.5,
+  for (const [index, hen] of state.hens.entries()) {
+    view.positionSprite(henSprites[index], hen.x, hen.y, {
+      ...gaitPose(hen.gait),
       brightness: (1 - index * .1) * (1 - dark * .65),
     });
   }
@@ -1393,7 +1423,10 @@ function renderWorld(dark) {
   renderFishing();
   destination.hidden = !state.pointer;
   if (state.pointer) position(destination, state.pointer.x, state.pointer.y);
-  view.draw(camera, player, { dark, torch: car.driving || pack.light, handFlame: pack.flameOn, fire, groundTorch });
+  view.draw(camera, player, {
+    dark, torch: car.driving || pack.light, torchRange: 300 + (car.driving ? 0 : gearBonus("torchRange")),
+    handFlame: pack.flameOn, fire, groundTorch,
+  });
 }
 
 function renderVehicleControls(car, boat) {
@@ -1425,7 +1458,8 @@ function render() {
   setText("clock-day", "Päivä " + (1 + Math.floor(state.minutes / 1440)));
   setText("clock-time", String(hours).padStart(2, "0") + "." + String(minutes).padStart(2, "0"));
   const dark = darkness();
-  const weather = weatherAt(state.minutes - START_TIME);
+  const biome = biomeAt(player.x, player.y);
+  const weather = weatherAt(state.minutes - START_TIME, biome);
   const night = dark > .35;
   setIcon("clock-icon", night ? "moon" : "sun");
   byId("clock-icon").closest(".clock").classList.toggle("is-night", night);
@@ -1434,6 +1468,7 @@ function render() {
   setIcon("weather-icon", weather.icon === "sun" && night ? "moon" : weather.icon);
 
   interior.hidden = !shelter || Boolean(state.tunnelTrip);
+  renderCabinSearch(interior.hidden ? null : shelter);
   scene.classList.toggle("in-vehicle", car.driving || boat.aboard);
   interior.classList.toggle("inside-garage", shelter === garage);
   interior.classList.toggle("inside-bunker", shelter?.id === bunker.id);
@@ -1441,7 +1476,8 @@ function render() {
   byId("garage-car").hidden = shelter !== garage || !car.inGarage;
   world.hidden = Boolean(shelter || state.tunnelTrip);
   renderMapDirection(player, state.mapTarget);
-  setText("area-title", onTower ? tower.label : shelter?.label ?? "Korpimetsä");
+  const area = insideCore(player.x, player.y) ? "Korpimetsä" : terrainBiomes[biome].label;
+  setText("area-title", onTower ? tower.label : shelter?.label ?? area);
   setText("location", shelter ? "Suojassa" : region(onTower ? tower.base : player));
   setIcon("location-icon", shelter ? shelter.icon : onTower ? "tower" : car.driving ? "car" : boat.aboard ? "boat" : "pin");
   if (shelter) {
@@ -1453,7 +1489,7 @@ function render() {
     setText("rest-label", state.resting ? "Herää" : "Lepää");
   }
 
-  const situation = describeSituation();
+  const situation = describeSituation(biome);
   setText("status-title", situation.title);
   setText("status-copy", situation.copy);
   setIcon("status-icon", situation.iconName);
@@ -1496,7 +1532,7 @@ function render() {
 }
 
 function renderInventory(pack) {
-  const slots = { torch: "Taskulamppu", berries: "Marjat", water: "Vesi", bandage: "Side", mushrooms: "Ruokasienet", fish: "Kala", wood: "Puu", stone: "Kivi", wool: "Villa" };
+  const slots = { torch: state.gear.has("cabin-lamp") ? "Tehotaskulamppu" : "Taskulamppu", berries: "Marjat", water: "Vesi", bandage: "Side", mushrooms: "Ruokasienet", fish: "Kala", wood: "Puu", stone: "Kivi", wool: "Villa" };
   for (const [item, name] of Object.entries(slots)) {
     const slot = byId("slot-" + item);
     const showCount = pack[item] || item === "wood" || item === "stone" || item === "wool";
@@ -1600,12 +1636,22 @@ function toggleSound() {
   playSound(420);
 }
 
+function gameKey(event) {
+  if (event.code && event.code !== "Unidentified") return event.code;
+  const key = event.key;
+  if (/^[a-z]$/i.test(key)) return "Key" + key.toUpperCase();
+  if (/^[0-9]$/.test(key)) return "Digit" + key;
+  if (key === "Shift") return "ShiftLeft";
+  return key === " " ? "Space" : key;
+}
+
 function bindControls() {
   scene.addEventListener("click", (event) => {
     if (event.target.closest("button") || state.shelter || state.onTower || state.car.driving || state.tunnelTrip || dialog.open) return;
+    scene.focus({ preventScroll: true });
     const rect = world.getBoundingClientRect();
-    const x = camera.x + (event.clientX - rect.left) / camera.scale;
-    const y = camera.y + (event.clientY - rect.top) / camera.scale;
+    const x = camera.x + (event.clientX - rect.left) * camera.width / rect.width;
+    const y = camera.y + (event.clientY - rect.top) * camera.height / rect.height;
     if (state.boat.aboard) return rowTo({ x, y });
     const resource = points.find((point) => gatherables[point.kind] && available(point) && Math.hypot(x - point.x, y - point.y + 12) < 23);
     const woolSource = points.find((point) => point.kind === "sheep" && available(point) && Math.hypot(x - point.x, y - point.y + 21) < 31);
@@ -1675,40 +1721,45 @@ function bindControls() {
   window.addEventListener("keydown", (event) => {
     if (dialog.open || recordingDialog.open || state.tunnelTrip || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.target.matches?.("input, select, textarea")) return;
-    if (event.code === "KeyJ" && !event.repeat) {
+    const code = gameKey(event);
+    if (code === "KeyJ" && !event.repeat) {
       if (expeditionDialog.open) expeditionDialog.close();
       else openExpedition();
       return;
     }
     if (expeditionDialog.open) return;
-    if (event.code === "KeyB" && !event.repeat && !mapDialog.open) {
+    if (code === "KeyB" && !event.repeat && !mapDialog.open) {
       if (craftingDialog.open) craftingDialog.close();
       else openCrafting();
       return;
     }
     if (craftingDialog.open) return;
-    if (event.code === "KeyM" && !event.repeat) {
+    if (code === "KeyM" && !event.repeat) {
       if (mapDialog.open) mapDialog.close();
       else openWorldMap();
       return;
     }
     if (mapDialog.open) return;
-    const brake = event.code === "Space" && state.car.driving;
-    if (moves[event.code] || event.code.startsWith("Shift") || brake) {
-      if (moves[event.code] || brake) event.preventDefault();
-      keys.add(event.code);
+    const brake = code === "Space" && state.car.driving;
+    if (moves[code] || code.startsWith("Shift") || brake) {
+      if (moves[code] || brake) event.preventDefault();
+      if (!event.repeat || !keys.has(code)) keys.set(code, "pressed");
     }
     if (event.repeat) return;
-    if (event.code === "Escape") {
+    if (code === "Escape") {
       event.preventDefault();
       showDialog("pause");
     }
-    if (event.code === "KeyE") interact();
-    if (event.code === "KeyC") buildCampfire();
-    if (event.code === "KeyG") placeFlame();
-    if (itemKeys[event.code]) useItem(itemKeys[event.code]);
+    if (code === "KeyE") interact();
+    if (code === "KeyC") buildCampfire();
+    if (code === "KeyG") placeFlame();
+    if (itemKeys[code]) useItem(itemKeys[code]);
   });
-  window.addEventListener("keyup", (event) => keys.delete(event.code));
+  window.addEventListener("keyup", (event) => {
+    const code = gameKey(event);
+    if (moves[code] && keys.get(code) === "pressed") keys.set(code, "tapped");
+    else keys.delete(code);
+  });
   window.addEventListener("blur", () => {
     keys.clear();
     driveTouches.clear();
@@ -1717,7 +1768,11 @@ function bindControls() {
 
 async function startGame() {
   makeExpeditionWorld();
-  view = await loadWorldView(byId("game-canvas"), [...shelters, garage].map(({ image }) => image));
+  const loadingMessage = byId("loading-message");
+  view = await loadWorldView(byId("game-canvas"), [...shelters, garage].map(({ image }) => image), (done, total) => {
+    if (!byId("retry-loading").hidden) return;
+    loadingMessage.textContent = "Metsä latautuu… " + Math.round(100 * done / total) + " %";
+  });
   playerSprite = view.addSprite("hiker");
   animalSprites = animalTypes.map(({ id }) => ({
     sprite: view.addSprite(id), shornSprite: id === "sheep" ? view.addSprite("sheep-shorn") : null,
@@ -1748,11 +1803,20 @@ let lastFrame;
 function frame(now) {
   const dt = Math.min(.05, Math.max(0, (now - lastFrame) / 1000));
   lastFrame = now;
-  if (!dialog.open && !mapDialog.open && !craftingDialog.open && !recordingDialog.open && !expeditionDialog.open && !document.hidden) tick(dt);
+  if (!dialog.open && !mapDialog.open && !craftingDialog.open && !recordingDialog.open && !expeditionDialog.open && !document.hidden) {
+    tick(dt);
+    for (const [code, status] of keys) {
+      if (status === "tapped") keys.delete(code);
+      else if (status === "pressed") keys.set(code, "held");
+    }
+  }
   render();
   requestAnimationFrame(frame);
 }
 startGame().catch((error) => {
-  loading.textContent = error.message || "Peli ei käynnistynyt. Lataa sivu uudelleen.";
+  byId("loading-message").textContent = error.message || "Peli ei käynnistynyt.";
+  const retry = byId("retry-loading");
+  retry.hidden = false;
+  retry.addEventListener("click", () => window.location.reload(), { once: true });
   console.error(error);
 });

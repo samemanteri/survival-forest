@@ -1,11 +1,5 @@
 "use strict";
 
-const terrainBiomes = {
-  spruce: "expanse-spruce.webp",
-  birch: "expanse-birch.webp",
-  ridge: "expanse-ridge.webp",
-  bog: "expanse-bog.webp",
-};
 const spriteSizes = {
   hiker: 65, wolf: 68, bear: 85, moose: 93, berries: 35, wood: 28, stone: 26, mushrooms: 31, campfire: 44,
   sheep: 49, "sheep-shorn": 44, fox: 36, hare: 25, "roe-deer": 66,
@@ -42,15 +36,20 @@ const artworkFallbacks = {
   "craft-seat.webp": "wood.webp", "craft-aid.webp": "stone.webp", "craft-wall.webp": "stone.webp",
 };
 
-async function loadWorldView(canvas, interiors) {
-  const terrainFiles = [...CORE_TERRAIN.map(({ file }) => file), ...Object.values(terrainBiomes)];
+async function loadWorldView(canvas, interiors, onProgress) {
+  const terrainFiles = [...CORE_TERRAIN, ...Object.values(terrainBiomes)].map(({ file }) => file);
   const files = new Set([...terrainFiles, ...Object.keys(spriteSizes).map((asset) => asset + ".webp"), ...interiors, ...Object.values(artworkFallbacks)]);
+  files.add("animal-gaits.webp");
+  files.add("hiker-gaits.webp");
+  let completed = 0;
   const images = new Map(await Promise.all(Array.from(files, async (file) => {
     try {
       return await loadWorldImage(file);
     } catch (error) {
       if (!artworkFallbacks[file]) throw error;
       return [file, null];
+    } finally {
+      onProgress(++completed, files.size);
     }
   })));
   for (const [file, fallback] of Object.entries(artworkFallbacks)) {
@@ -63,7 +62,7 @@ async function loadWorldView(canvas, interiors) {
 
   if (location.protocol !== "file:") {
     try {
-      const { createWorldView } = await withLoadTimeout(import("./world-view.js?v=8"), 4000, "Three.js:n lataus viivästyi.");
+      const { createWorldView } = await withLoadTimeout(import("./world-view.js?v=10"), 4000, "Three.js:n lataus viivästyi.");
       const surface = canvas.cloneNode(false);
       const view = createWorldView(surface, artwork);
       canvas.replaceWith(surface);
@@ -87,7 +86,7 @@ function makeTerrain(images) {
       const fadeTop = row > 0;
       const key = [biome, variant, fadeLeft, fadeTop].join("-");
       if (!textures.has(key)) {
-        textures.set(key, paintTile(images.get(terrainBiomes[biome]), variant, fadeLeft, fadeTop));
+        textures.set(key, paintTile(images.get(terrainBiomes[biome].file), variant, fadeLeft, fadeTop));
       }
       tiles.push({ x, y, width: TILE_WIDTH + TILE_BLEND, height: TILE_HEIGHT + TILE_BLEND, image: textures.get(key) });
     }
@@ -193,7 +192,7 @@ async function loadWorldImage(file) {
     image.onerror = () => reject(new Error("Pelin kuvaa ei voitu avata: " + file + "."));
   });
   image.src = "./assets/" + file;
-  await withLoadTimeout(loaded, 8000, "Pelin kuvan lataus viivästyi: " + file + ". Lataa sivu uudelleen.");
+  await loaded;
   return [file, image];
 }
 
@@ -205,15 +204,16 @@ function createCanvasView(canvas, { terrain, images, spriteSizes }) {
   const sprites = [];
 
   function addSprite(asset) {
-    const image = images.get(asset + ".webp");
+    const art = gaitArtwork(asset);
+    const image = images.get(art?.file ?? asset + ".webp");
     const height = spriteSizes[asset];
-    const sprite = { image, width: height * image.naturalWidth / image.naturalHeight, height, player: asset === "hiker", centered: asset === "car" || asset === "boat" };
+    const sprite = { image, art, width: height * image.naturalWidth / image.naturalHeight, height, player: asset === "hiker", centered: asset === "car" || asset === "boat" };
     sprites.push(sprite);
     return sprite;
   }
 
-  function positionSprite(sprite, x, y, { facing = 1, step = 0, brightness = 1, visible = true, angle = 0 } = {}) {
-    Object.assign(sprite, { x, y, facing, step, brightness, visible, angle });
+  function positionSprite(sprite, x, y, { facing = 1, step = 0, brightness = 1, visible = true, angle = 0, frame = 0, rowOffset = 0, widthScale = 1 } = {}) {
+    Object.assign(sprite, { x, y, facing, step, brightness, visible, angle, frame, rowOffset, widthScale });
   }
 
   function removeSprite(sprite) {
@@ -227,7 +227,7 @@ function createCanvasView(canvas, { terrain, images, spriteSizes }) {
     canvas.height = lightCanvas.height = Math.round(pixelHeight * ratio);
   }
 
-  function draw(view, player, { dark, torch, shelterImage, handFlame, fire, groundTorch }) {
+  function draw(view, player, { dark, torch, torchRange = 300, shelterImage, handFlame, fire, groundTorch }) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (shelterImage) {
       ctx.drawImage(images.get(shelterImage), 0, 0, canvas.width, canvas.height);
@@ -257,13 +257,13 @@ function createCanvasView(canvas, { terrain, images, spriteSizes }) {
       light.fillStyle = halo;
       light.fillRect(player.x - radius, player.y - radius, radius * 2, radius * 2);
       if (torch) {
-        const beam = light.createRadialGradient(player.x, player.y, 62, player.x, player.y, 300);
+        const beam = light.createRadialGradient(player.x, player.y, 62, player.x, player.y, torchRange);
         beam.addColorStop(0, "#000");
         beam.addColorStop(1, "#0000");
         light.fillStyle = beam;
         light.beginPath();
         light.moveTo(player.x, player.y);
-        light.arc(player.x, player.y, 300, player.angle - .5, player.angle + .5);
+        light.arc(player.x, player.y, torchRange, player.angle - .5, player.angle + .5);
         light.fill();
       }
       for (const source of [fire, groundTorch]) {
@@ -290,9 +290,16 @@ function createCanvasView(canvas, { terrain, images, spriteSizes }) {
       }
       ctx.translate(sprite.x, sprite.y - sprite.step);
       ctx.rotate(sprite.angle);
-      ctx.scale(sprite.facing, 1);
+      ctx.scale(sprite.facing * sprite.widthScale, 1);
       ctx.filter = "brightness(" + Math.pow(sprite.brightness, .45) + ")";
-      ctx.drawImage(sprite.image, -sprite.width / 2, -sprite.height * (sprite.centered ? .5 : .98), sprite.width, sprite.height);
+      if (sprite.art) {
+        const { width, height, footY, figureHeight } = gaitCell;
+        const scale = sprite.height / figureHeight;
+        ctx.drawImage(sprite.image, sprite.frame * width, (sprite.art.row + sprite.rowOffset) * height, width, height,
+          -width * scale / 2, -footY * scale, width * scale, height * scale);
+      } else {
+        ctx.drawImage(sprite.image, -sprite.width / 2, -sprite.height * (sprite.centered ? .5 : .98), sprite.width, sprite.height);
+      }
       ctx.restore();
     }
   }

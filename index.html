@@ -6,18 +6,21 @@
   <meta name="theme-color" content="#171b16">
   <title>Korpi – Metsäselviytyminen</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css?v=14">
-  <script src="terrain-map.js?v=6" defer></script>
-  <script src="tree-collision.js?v=7" defer></script>
-  <script src="view-loader.js?v=14" defer></script>
+  <link rel="stylesheet" href="style.css?v=16">
+  <script src="terrain-map.js?v=7" defer></script>
+  <script src="tree-collision.js?v=8" defer></script>
+  <script src="character-motion.js?v=1" defer></script>
+  <script src="view-loader.js?v=18" defer></script>
   <script src="expedition.js?v=14" defer></script>
-  <script src="crafting.js?v=14" defer></script>
-  <script src="weather.js?v=11" defer></script>
+  <script src="crafting.js?v=15" defer></script>
+  <script src="weather.js?v=12" defer></script>
   <script src="mystery.js?v=12" defer></script>
-  <script src="game.js?v=14" defer></script>
+  <script src="cabin-search.js?v=15" defer></script>
+  <script src="game.js?v=18" defer></script>
 </head>
 <body>
   <svg class="symbol-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-snow" viewBox="0 0 24 24"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 4l3 3 3-3M9 20l3-3 3 3M3.5 10l4.1-.9-.9-4.1m13.8 9-4.1.9.9 4.1M3.5 14l4.1.9-.9 4.1m13.8-9-4.1-.9.9-4.1"/></symbol>
     <symbol id="i-logo" viewBox="0 0 28 28"><path d="m11 3-5 7h3l-5 6h4l-5 6h16l-5-6h4l-5-6h3l-5-7ZM11 22v3M19 8l4 6h-2l4 5h-3l3 3h-3m-1 0v3"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
     <symbol id="i-sunset" viewBox="0 0 24 24"><path d="M2 17h20M5 21h14M7 17a5 5 0 0 1 10 0M12 4v6m-3-3 3 3 3-3m-9 5-2-2m14 2 2-2"/></symbol>
@@ -100,7 +103,7 @@
 
   <main class="layout">
     <section class="game-column" aria-label="Pelialue">
-      <div id="scene" class="scene">
+      <div id="scene" class="scene" role="group" aria-label="Pelimaasto" tabindex="0">
         <canvas id="game-canvas" class="game-canvas" aria-hidden="true"></canvas>
         <canvas id="weather-canvas" class="weather-canvas" aria-hidden="true" hidden></canvas>
         <div id="world" class="world">
@@ -113,6 +116,7 @@
           </svg>
         </div>
         <div id="interior" class="interior" hidden>
+          <div id="cabin-search" class="cabin-search" role="group" aria-label="Siirrettävät tavarat ja löydöt" hidden></div>
           <img id="garage-car" class="garage-car" src="assets/car.webp" alt="Auto tallissa" draggable="false" hidden>
           <button id="search-shelter" class="map-marker shelter-loot" type="button">
             <svg class="icon"><use id="search-icon" href="#i-pack"/></svg><span id="search-label">Tutki pöytä</span>
@@ -152,7 +156,10 @@
           <strong>Maanalainen käytävä</strong>
           <span id="tunnel-destination"></span>
         </div>
-        <p id="game-loading" class="game-loading" role="status">Metsä latautuu…</p>
+        <div id="game-loading" class="game-loading">
+          <span id="loading-message" role="status">Metsä latautuu…</span>
+          <button id="retry-loading" type="button" class="game-button" hidden>Yritä uudelleen</button>
+        </div>
         <noscript><p class="game-loading">Salli JavaScript selaimessa, jotta voit pelata.</p></noscript>
       </div>
       <div id="control-strip" class="control-strip">
@@ -288,6 +295,7 @@
           <span id="trail-count-sap" hidden></span>
           <span id="trail-count-honey" hidden></span>
         </div>
+        <div id="cabin-gear" class="expedition-stock" role="group" aria-label="Löydetyt varusteet" hidden></div>
       </section>
     </aside>
   </main>
@@ -361,15 +369,15 @@
     </div>
     <div id="map-stage" class="map-stage">
       <canvas id="map-overview" aria-hidden="true"></canvas>
-      <div id="map-regions" aria-hidden="true"></div>
+      <div id="map-regions" role="group" aria-label="Kartta-alueet ja biomit"></div>
       <div id="map-landmarks" role="group" aria-label="Kartan suojat ja maamerkit"></div>
-      <span class="map-north" aria-hidden="true"><svg class="icon"><use href="#i-direction"/></svg>P</span>
       <span id="map-position" class="map-position" title="Sijaintisi"></span>
       <span id="map-route-pin" class="map-route-pin" hidden aria-hidden="true"><svg class="icon"><use href="#i-pin"/></svg></span>
     </div>
     <div class="map-dialog-footer">
       <span><i class="map-key-position"></i> Sijaintisi</span>
       <span><i class="map-key-shelter"></i> Suoja tai maamerkki</span>
+      <span class="map-north" role="img" aria-label="Pohjoinen on kartan yläreunassa"><svg class="icon" aria-hidden="true"><use href="#i-direction"/></svg>P</span>
       <button id="clear-map-pin" type="button" class="help-button" hidden>Poista reittimerkki</button>
     </div>
   </dialog>
@@ -384,6 +392,7 @@
         <div><kbd>WASD / nuolet</kbd><span>Liiku. Voit myös klikata maastoa.</span></div>
         <div><kbd>Shift</kbd><span>Juokse, kun jaksamista riittää.</span></div>
         <div><kbd>E</kbd><span>Toimi kohteen lähellä tai klikkaa sen merkkiä.</span></div>
+        <div><kbd>Hiiri</kbd><span>Vedä mökissä tavaroita sivuun. Ota paljastunut löytö klikkaamalla sitä.</span></div>
         <div><kbd>E</kbd><span>Keritse lammas laitumella. Sänkyyn tarvitaan kolme puuta ja kaksi villaa.</span></div>
         <div><kbd>M</kbd><span>Avaa erämaakartta ja merkitse kohde.</span></div>
         <div><kbd>B</kbd><span>Avaa rakentamisvalikko. Käytä maastoon asetettuja esineitä painamalla E.</span></div>

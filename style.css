@@ -171,6 +171,43 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .destination { width: 19px; height: 12px; border: 1px solid #f6d69c; border-radius: 50%; transform: translate(-50%, -50%); background: #f7d08f4d; pointer-events: none; }
 
 .interior { z-index: 3; }
+.cabin-search { position: absolute; inset: 0; isolation: isolate; pointer-events: none; }
+.cabin-prop, .cabin-find {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: clamp(49px, 12%, 120px);
+  aspect-ratio: 1.45;
+  transform: translate(-50%, -50%);
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  pointer-events: auto;
+}
+.cabin-prop { z-index: 2; cursor: grab; touch-action: none; }
+.cabin-prop img, .cabin-find img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 3px #120b07ae);
+}
+.cabin-prop:hover img, .cabin-prop:focus-visible img {
+  filter: drop-shadow(0 0 3px #f7d18dc0) drop-shadow(0 4px 3px #120b07ae);
+}
+.cabin-prop.dragging { z-index: 3; cursor: grabbing; }
+.cabin-find {
+  z-index: 1;
+  width: clamp(39px, 7%, 73px);
+  aspect-ratio: 1;
+  padding: 3px;
+  border: 1px solid #e4ba71ca;
+  background: radial-gradient(ellipse, #4c3c24, #211a12df);
+  box-shadow: 0 0 11px #e5b25149;
+}
+.cabin-find:hover { border-color: #ffe4a8; background: #6b5330; }
 .garage-car { position: absolute; left: 53%; top: 60%; width: clamp(112px, 26%, 255px); transform: translate(-50%, -50%) rotate(90deg); filter: drop-shadow(5px 5px 5px #17150fd4); pointer-events: none; }
 .inside-garage .shelter-loot { top: 35%; left: 53%; }
 .shelter-loot { z-index: 6; left: 55%; top: 39%; }
@@ -403,7 +440,11 @@ button.slot:hover { border-color: #a5b297; background: #353f31; }
 .map-stage canvas { filter: saturate(.67) brightness(.75); pointer-events: none; }
 #map-regions, #map-landmarks { pointer-events: none; }
 #map-regions { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(3, 1fr); }
-.map-region { padding: clamp(2px, 1vw, 10px) 1px; border: solid #f3e7b62d; border-width: 0 1px 1px 0; color: #f2ead3; text-align: center; font-size: clamp(8px, 1.55vw, 14px); font-weight: 700; line-height: 1; text-shadow: 0 1px 4px #000, 0 1px 4px #000; }
+.map-region { display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: clamp(3px, 1vw, 10px) 1px; border: solid #f3e7b62d; border-width: 0 1px 1px 0; color: #f2ead3; text-align: center; font-size: clamp(8px, 1.55vw, 14px); font-weight: 700; line-height: 1; text-shadow: 0 1px 4px #000, 0 1px 4px #000; }
+.map-region small { padding: 2px 4px; border-radius: 4px; color: #dce9cf; background: #172218de; font-size: clamp(8px, 1.25vw, 11px); line-height: 1.15; }
+.map-region[data-biome="snow"] small { color: #deefff; background: #223844ec; }
+.map-region[data-biome="jungle"] small { color: #c1f6d6; background: #163725ec; }
+.map-region[data-biome="savanna"] small, .map-region[data-biome="desert"] small { color: #ffe0a7; background: #3a2b18ec; }
 .map-region:nth-child(5n) { border-right: 0; }
 .map-region:nth-child(n + 11) { border-bottom: 0; }
 .map-landmark, .map-position, .map-route-pin { position: absolute; transform: translate(-50%, -50%); }
@@ -411,7 +452,7 @@ button.slot:hover { border-color: #a5b297; background: #353f31; }
 .map-landmark .icon { width: 75%; height: 75%; }
 .map-landmark:hover, .map-landmark:focus-visible { z-index: 1; background: #596142; }
 .map-landmark.core-landmark { z-index: 1; }
-.map-north { position: absolute; bottom: 8px; right: 8px; display: flex; align-items: center; gap: 3px; color: #f1deb0; font-weight: 700; pointer-events: none; }
+.map-north { color: #f1deb0; font-weight: 700; }
 .map-north .icon { width: 14px; height: 14px; }
 .map-position, .map-key-position { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #faf4dc; background: #acd8ad; box-shadow: 0 0 0 2px #28332a; }
 .map-position { pointer-events: none; }
@@ -514,6 +555,8 @@ button.slot:hover { border-color: #a5b297; background: #353f31; }
   .scene.in-vehicle .interaction { top: auto; right: 9px; bottom: 62px; }
   .interior-actions { bottom: 57px; right: 9px; }
   .interior-actions button { min-height: 32px; padding: 5px 7px; font-size: 12px; }
+  .searchable-cabin .interior-actions { bottom: 9px; }
+  .searchable-cabin .field-status { max-width: calc(100% - 154px); }
   .bunker-hatch { top: 60%; transform: translate(-50%, -28%); }
   .bunker-hatch .hatch-illustration { grid-row: 1; }
   .bunker-hatch .game-button { grid-row: 2; min-height: 32px; padding: 5px 7px; font-size: 11px; }

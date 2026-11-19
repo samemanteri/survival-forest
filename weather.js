@@ -8,6 +8,10 @@ const weatherStages = [
   { until: 570, name: "Pouta", icon: "sun", fog: 0, rain: 0 },
 ];
 
+const frostWeather = { name: "Pakkanen", icon: "snow" };
+const snowfall = { name: "Lumisade", icon: "snow", snow: .65, fog: .1 };
+const desertWeather = { name: "Kuivaa", icon: "sun" };
+
 const weatherCanvas = document.getElementById("weather-canvas");
 const weatherContext = weatherCanvas.getContext("2d");
 const reducedWeatherMotion = matchMedia("(prefers-reduced-motion: reduce)");
@@ -19,10 +23,16 @@ const rainStreaks = Array.from({ length: 160 }, (_, index) => ({
 }));
 const weatherSize = { width: 0, height: 0, ratio: 1 };
 
-function weatherAt(minutes) {
+function weatherAt(minutes, biome) {
+  if (biome === "desert") return desertWeather;
   const period = weatherStages.at(-1).until;
   const offset = Math.max(0, minutes) % period;
-  return weatherStages.find((stage) => offset < stage.until);
+  const stage = weatherStages.find((stage) => offset < stage.until);
+  if (biome === "snow") {
+    if (stage.rain) return snowfall;
+    if (!stage.fog) return frostWeather;
+  }
+  return stage;
 }
 
 function resizeWeather(width, height) {
@@ -36,7 +46,7 @@ function resizeWeather(width, height) {
 
 function drawWeather(weather, dark, elapsed, view, focus, indoor) {
   const ctx = weatherContext;
-  weatherCanvas.hidden = indoor || !ctx || (!weather.fog && !weather.rain);
+  weatherCanvas.hidden = indoor || !ctx || (!weather.fog && !weather.rain && !weather.snow);
   if (weatherCanvas.hidden) return;
   const { width, height } = weatherSize;
   ctx.clearRect(0, 0, width, height);
@@ -59,6 +69,21 @@ function drawWeather(weather, dark, elapsed, view, focus, indoor) {
     ctx.fillStyle = nearby;
     ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
     ctx.globalCompositeOperation = "source-over";
+  }
+  if (weather.snow) {
+    const time = reducedWeatherMotion.matches ? 0 : elapsed;
+    const count = Math.min(rainStreaks.length, Math.round((width / 7 + 12) * weather.snow));
+    ctx.fillStyle = "rgba(235, 247, 255, .67)";
+    ctx.beginPath();
+    for (let index = 0; index < count; index++) {
+      const flake = rainStreaks[index];
+      const radius = 1 + index % 4 * .35;
+      const x = (flake.x * (width + 20) + time * 21) % (width + 20) - 10;
+      const y = (flake.y * (height + 20) + time * flake.speed * .1) % (height + 20) - 10;
+      ctx.moveTo(x + radius, y);
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+    }
+    ctx.fill();
   }
   if (weather.rain) {
     const moving = !reducedWeatherMotion.matches;

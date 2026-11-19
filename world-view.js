@@ -46,6 +46,7 @@ export function createWorldView(canvas, { terrain, images, spriteSizes }) {
       player: { value: new THREE.Vector2() },
       direction: { value: new THREE.Vector2() },
       torch: { value: false },
+      torchRange: { value: 300 },
       handFlame: { value: false },
       campfire: { value: new THREE.Vector4() },
       groundTorch: { value: new THREE.Vector4() },
@@ -63,6 +64,7 @@ export function createWorldView(canvas, { terrain, images, spriteSizes }) {
       uniform vec2 player;
       uniform vec2 direction;
       uniform bool torch;
+      uniform float torchRange;
       uniform bool handFlame;
       uniform vec4 campfire;
       uniform vec4 groundTorch;
@@ -79,7 +81,7 @@ export function createWorldView(canvas, { terrain, images, spriteSizes }) {
         float beam = 0.0;
         if (torch) {
           float alignment = dot(offset, direction) / max(distanceToPlayer, 0.01);
-          beam = smoothstep(0.86, 0.94, alignment) * (1.0 - smoothstep(62.0, 300.0, distanceToPlayer));
+          beam = smoothstep(0.86, 0.94, alignment) * (1.0 - smoothstep(62.0, torchRange, distanceToPlayer));
         }
         float firelight = max(lightAt(campfire), lightAt(groundTorch));
         gl_FragColor = vec4(0.018, 0.032, 0.061, night * 0.96 * (1.0 - max(max(halo, beam), firelight)));
@@ -99,8 +101,27 @@ export function createWorldView(canvas, { terrain, images, spriteSizes }) {
     color: 0xeacc86, transparent: true, opacity: .85, depthWrite: false, depthTest: false,
   });
 
+  // Share immutable UVs for each pose so individual animals can use the same texture independently.
+  const framePlanes = new Map();
+  function framePlane(sprite, frame, rowOffset) {
+    const row = sprite.art.row + rowOffset;
+    const image = sprite.mesh.material.map.image;
+    const key = sprite.art.file + "/" + row + "/" + frame;
+    if (!framePlanes.has(key)) {
+      const geometry = plane.clone();
+      const uv = geometry.attributes.uv;
+      for (let i = 0; i < uv.count; i++) {
+        uv.setXY(i, (frame + uv.getX(i)) * gaitCell.width / image.width,
+          1 - (row + 1 - uv.getY(i)) * gaitCell.height / image.height);
+      }
+      framePlanes.set(key, geometry);
+    }
+    return framePlanes.get(key);
+  }
+
   function addSprite(asset) {
-    const map = textures.get(asset + ".webp");
+    const art = gaitArtwork(asset);
+    const map = textures.get(art?.file ?? asset + ".webp");
     const size = spriteSizes[asset];
     const mesh = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({
       map, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
@@ -108,19 +129,23 @@ export function createWorldView(canvas, { terrain, images, spriteSizes }) {
     const isPlayer = asset === "hiker";
     const centered = asset === "car" || asset === "boat";
     const shadow = new THREE.Mesh(isPlayer ? playerRing : shadowGeometry, isPlayer ? playerRingMaterial : shadowMaterial);
-    const spriteWidth = size * map.image.width / map.image.height;
+    const original = images.get(asset + ".webp");
+    const spriteWidth = size * original.width / original.height;
     shadow.renderOrder = 2;
     shadow.scale.set(isPlayer ? 16 : spriteWidth * (centered ? .45 : .32), size * (centered ? .38 : .105), 1);
     outdoors.add(shadow, mesh);
-    return { mesh, shadow, width: spriteWidth, height: size, centered };
+    const unit = size / gaitCell.figureHeight;
+    return { mesh, shadow, art, width: art ? gaitCell.width * unit : spriteWidth, height: art ? gaitCell.height * unit : size,
+      centerAboveGround: art ? (gaitCell.footY - gaitCell.height / 2) * unit : centered ? 0 : size * .48 };
   }
 
-  function positionSprite(sprite, x, y, { facing = 1, step = 0, brightness = 1, visible = true, angle = 0 } = {}) {
+  function positionSprite(sprite, x, y, { facing = 1, step = 0, brightness = 1, visible = true, angle = 0, frame = 0, rowOffset = 0, widthScale = 1 } = {}) {
     const { mesh, shadow } = sprite;
     mesh.visible = shadow.visible = visible;
     if (!visible) return;
-    mesh.position.set(x, -y + (sprite.centered ? 0 : sprite.height * .48) + step, 0);
-    mesh.scale.set(facing * sprite.width, sprite.height, 1);
+    if (sprite.art) mesh.geometry = framePlane(sprite, frame, rowOffset);
+    mesh.position.set(x, -y + sprite.centerAboveGround + step, 0);
+    mesh.scale.set(facing * widthScale * sprite.width, sprite.height, 1);
     mesh.rotation.z = shadow.rotation.z = -angle;
     mesh.renderOrder = 10 + y - groundTop;
     mesh.material.color.setScalar(brightness);
@@ -139,7 +164,7 @@ export function createWorldView(canvas, { terrain, images, spriteSizes }) {
     renderer.setSize(pixelWidth, pixelHeight, false);
   }
 
-  function draw(view, player, { dark, torch, shelterImage, handFlame, fire, groundTorch }) {
+  function draw(view, player, { dark, torch, torchRange = 300, shelterImage, handFlame, fire, groundTorch }) {
     if (shelterImage) {
       indoors.background = textures.get(shelterImage);
       renderer.render(indoors, camera);
@@ -153,6 +178,7 @@ export function createWorldView(canvas, { terrain, images, spriteSizes }) {
     lighting.uniforms.player.value.set(player.x, player.y);
     lighting.uniforms.direction.value.set(Math.cos(player.angle), Math.sin(player.angle));
     lighting.uniforms.torch.value = torch;
+    lighting.uniforms.torchRange.value = torchRange;
     lighting.uniforms.handFlame.value = Boolean(handFlame);
     if (fire) lighting.uniforms.campfire.value.set(fire.x, fire.y, fire.radius, fire.glow);
     else lighting.uniforms.campfire.value.w = 0;
